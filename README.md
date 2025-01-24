@@ -37,6 +37,56 @@ A Chrome extension that enables users to capture screenshots with advanced featu
 - OpenAI API key
 - Chrome browser
 
+## Database and Storage Setup
+
+### MongoDB Setup
+
+1. Install MongoDB locally or create a MongoDB Atlas account
+2. Create a new database for the project
+3. Create the following collections:
+   - `screenshots` - Stores screenshot metadata
+   - `transcriptions` - Stores transcription data
+4. Get your MongoDB connection URI:
+   - For local MongoDB: `mongodb://localhost:27017/your_database_name`
+   - For MongoDB Atlas: Get the connection string from your cluster settings
+
+### MinIO/S3 Bucket Setup
+
+1. Set up MinIO locally or use AWS S3:
+   - For MinIO:
+     ```bash
+     # Install MinIO (macOS example)
+     brew install minio/stable/minio
+     
+     # Start MinIO server
+     minio server /path/to/data
+     ```
+   - Access MinIO console (default: http://localhost:9001)
+
+2. Create a new bucket:
+   - Name it `screenshots` (or your preferred name)
+   - Set bucket policy to allow read/write access
+   - Configure CORS policy for your domain
+
+3. Get your credentials:
+   - For MinIO: Note down the Access Key and Secret Key
+   - For AWS S3: Create IAM user with S3 access and get credentials
+
+4. Required bucket policy (adjust as needed):
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Effect": "Allow",
+         "Principal": "*",
+         "Action": ["s3:GetObject", "s3:PutObject"],
+         "Resource": ["arn:aws:s3:::your-bucket-name/*"]
+       }
+     ]
+   }
+   ```
+
 ## Installation
 
 1. Clone the repository:
@@ -52,9 +102,17 @@ A Chrome extension that enables users to capture screenshots with advanced featu
 
 3. Create a `.env` file in the root directory with your configuration:
    ```
+   # MongoDB Configuration
    MONGODB_URI=your_mongodb_uri
-   AWS_ACCESS_KEY_ID=your_aws_access_key
-   AWS_SECRET_ACCESS_KEY=your_aws_secret_key
+
+   # MinIO/S3 Configuration
+   AWS_ACCESS_KEY_ID=your_access_key
+   AWS_SECRET_ACCESS_KEY=your_secret_key
+   AWS_REGION=your_region
+   AWS_ENDPOINT=http://localhost:9000  # For MinIO local setup
+   AWS_BUCKET_NAME=screenshots
+
+   # OpenAI Configuration
    OPENAI_API_KEY=your_openai_api_key
    ```
 
