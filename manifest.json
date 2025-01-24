@@ -9,12 +9,25 @@
     "downloads"
   ],
   "host_permissions": [
-    "http://localhost:9000/*"
+    "http://localhost:9000/*",
+    "http://localhost:3002/*"
   ],
   "action": {
     "default_popup": "popup.html"
   },
   "background": {
     "service_worker": "background.js"
+  },
+  "web_accessible_resources": [{
+    "resources": [
+      "dist/*",
+      "public/*",
+      "components/*",
+      "public/lib/*"
+    ],
+    "matches": ["<all_urls>"]
+  }],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
   }
 }

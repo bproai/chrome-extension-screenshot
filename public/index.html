@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transcription Viewer</title>
+    <script src="https://unpkg.com/react@17/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f5f5f5;
+            min-height: 100vh;
+        }
+        #root {
+            padding: 2rem 0;
+        }
+        .bg-card {
+            background-color: white;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <!-- Load components in order -->
+    <script type="text/babel" src="/components/ui/card.jsx"></script>
+    <script type="text/babel" src="/components/TranscriptionViewer.jsx"></script>
+    <script type="text/babel">
+        // Wait for components to be loaded
+        setTimeout(() => {
+            ReactDOM.render(
+                React.createElement(TranscriptionViewer),
+                document.getElementById('root')
+            );
+        }, 100);
+    </script>
+</body>
+</html>

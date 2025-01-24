@@ -7,6 +7,12 @@ const { OpenAI } = require('openai');
 
 const app = express();
 const port = 3002;
+const path = require('path');
+
+// Serve static files from various directories
+app.use('/dist', express.static('dist'));
+app.use(express.static('public'));
+app.use('/components', express.static('components'));
 
 // Initialize AWS S3 (MinIO)
 const s3 = new AWS.S3({
@@ -35,10 +41,7 @@ async function getImageFromMinIO(objectKey) {
 // Function to transcribe image using OpenAI
 async function transcribeImage(imageBuffer) {
     try {
-        // Convert the image buffer to a base64-encoded string
         const base64Image = imageBuffer.toString('base64');
-
-        // Create the message content with the base64-encoded image
         const messages = [
             {
                 role: "user",
@@ -55,14 +58,12 @@ async function transcribeImage(imageBuffer) {
             }
         ];
 
-        // Send the request to the OpenAI API
         const response = await openai.chat.completions.create({
             model: "gpt-4-turbo",
             messages: messages,
             store: true
         });
 
-        // Return the transcribed text
         return response.choices[0].message.content;
     } catch (error) {
         console.error('OpenAI API error:', error);
@@ -77,7 +78,6 @@ async function processNewImages() {
         const db = client.db(dbName);
         const collection = db.collection('minio_bucket');
         
-        // Get all unprocessed images
         const unprocessed = await collection.find({
             transcription: { $exists: false }
         }).toArray();
@@ -88,7 +88,6 @@ async function processNewImages() {
                 const imageBuffer = await getImageFromMinIO(doc.objectKey);
                 const transcription = await transcribeImage(imageBuffer);
                 
-                // Update MongoDB with transcription
                 await collection.updateOne(
                     { _id: doc._id },
                     {
@@ -220,7 +219,13 @@ app.post('/remove-all-transcriptions', async (req, res) => {
     }
 });
 
+// Route to serve the transcription viewer page
+app.get('/viewer', (req, res) => {
+    res.sendFile(path.join(__dirname, 'dist', 'transcriptions.html'));
+});
+
 app.listen(port, () => {
     console.log(`Server running at http://localhost:${port}`);
     console.log('Processing new images every minute...');
+    console.log(`Transcription viewer available at http://localhost:${port}/viewer`);
 });

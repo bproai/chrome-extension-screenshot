@@ -89,19 +89,27 @@ async function saveToMongoDB(objectKey) {
 
 let s3;
 
-function initializeButton() {
-    console.log('Initializing button');
-    const button = document.getElementById('captureBtn');
-    if (!button) {
-        console.error('Button not found');
+function initializeButtons() {
+    console.log('Initializing buttons');
+    const captureBtn = document.getElementById('captureBtn');
+    const viewTranscriptionsBtn = document.getElementById('viewTranscriptionsBtn');
+    
+    if (!captureBtn || !viewTranscriptionsBtn) {
+        console.error('One or more buttons not found');
         return;
     }
     
-    console.log('Button element found:', button);
+    console.log('Button elements found');
     
-    button.addEventListener('click', async () => {
-        console.log('Button clicked');
-        button.disabled = true;
+    // Initialize view transcriptions button
+    viewTranscriptionsBtn.addEventListener('click', () => {
+        chrome.tabs.create({ url: 'public/transcriptions.html' });
+    });
+    
+    // Initialize capture button
+    captureBtn.addEventListener('click', async () => {
+        console.log('Capture button clicked');
+        captureBtn.disabled = true;
         document.getElementById('status').textContent = 'Capturing screenshot...';
         
         try {
@@ -126,7 +134,7 @@ function initializeButton() {
             console.error('Error:', error);
             document.getElementById('status').textContent = 'Error: ' + error.message;
         } finally {
-            button.disabled = false;
+            captureBtn.disabled = false;
         }
     });
 }
@@ -142,7 +150,7 @@ window.addEventListener('load', async () => {
         if (s3) {
             console.log('AWS S3 initialized successfully');
             document.getElementById('status').textContent = 'Ready';
-            initializeButton();
+            initializeButtons();
         } else {
             throw new Error('Failed to initialize AWS S3');
         }
