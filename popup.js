@@ -103,7 +103,7 @@ function initializeButtons() {
     
     // Initialize view transcriptions button
     viewTranscriptionsBtn.addEventListener('click', () => {
-        chrome.tabs.create({ url: 'public/transcriptions.html' });
+        chrome.tabs.create({ url: 'http://localhost:3002/viewer' });
     });
     
     // Initialize capture button

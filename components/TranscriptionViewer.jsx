@@ -41,17 +41,17 @@ function TranscriptionViewer() {
     code: ({ inline, className, children, ...props }) => {
       const match = /language-(\w+)/.exec(className || '');
       return inline ? (
-        <code {...props} className="font-mono text-sm bg-gray-100 rounded px-1 text-gray-800">
+        <code {...props} className="font-mono text-sm bg-gray-50 rounded px-1 font-semibold" style={{ color: 'rgb(0, 0, 0)' }}>
           {children}
         </code>
       ) : (
-        <code {...props} className="font-mono text-sm block text-gray-800">
+        <code {...props} className="font-mono text-sm block font-semibold" style={{ color: 'rgb(0, 0, 0)' }}>
           {children}
         </code>
       );
     },
     pre: ({ children, ...props }) => (
-      <pre {...props} className="bg-gray-50 rounded-lg p-4 my-4 overflow-x-auto text-gray-800">
+      <pre {...props} className="bg-gray-50 rounded-lg p-4 my-4 overflow-x-auto font-semibold" style={{ color: 'rgb(0, 0, 0)' }}>
         {children}
       </pre>
     ),
