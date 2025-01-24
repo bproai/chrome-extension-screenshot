@@ -38,21 +38,32 @@ function TranscriptionViewer() {
     p: (props) => (
       <p {...props} className="my-2" />
     ),
-    code: (props) => (
-      props.inline ? (
-        <code {...props} className="font-mono text-sm bg-gray-100 rounded px-1 text-gray-800" />
+    code: ({ inline, className, children, ...props }) => {
+      const match = /language-(\w+)/.exec(className || '');
+      return inline ? (
+        <code {...props} className="font-mono text-sm bg-gray-100 rounded px-1 text-gray-800">
+          {children}
+        </code>
       ) : (
-        <code {...props} className="font-mono text-sm block text-gray-800" />
-      )
+        <code {...props} className="font-mono text-sm block text-gray-800">
+          {children}
+        </code>
+      );
+    },
+    pre: ({ children, ...props }) => (
+      <pre {...props} className="bg-gray-50 rounded-lg p-4 my-4 overflow-x-auto text-gray-800">
+        {children}
+      </pre>
     ),
-    pre: (props) => (
-      <pre {...props} className="bg-gray-50 rounded-lg p-4 my-4 overflow-x-auto text-gray-800" />
+    ol: ({ ordered, children, ...props }) => (
+      <ol {...props} className="list-decimal ml-6 my-2">
+        {children}
+      </ol>
     ),
-    ol: (props) => (
-      <ol {...props} className="list-decimal ml-6 my-2" />
-    ),
-    ul: (props) => (
-      <ul {...props} className="list-disc ml-6 my-2" />
+    ul: ({ ordered, children, ...props }) => (
+      <ul {...props} className="list-disc ml-6 my-2">
+        {children}
+      </ul>
     )
   };
 
