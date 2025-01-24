@@ -54,8 +54,35 @@ async function uploadToMinio(file) {
     try {
         await s3.upload(params).promise();
         console.log('Screenshot uploaded to MinIO:', key);
+        return key; // Return the key for MongoDB storage
     } catch (error) {
         console.error('Upload error:', error);
+        throw error;
+    }
+}
+
+async function saveToMongoDB(objectKey) {
+    try {
+        const response = await fetch('http://localhost:3002/save-minio-key', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                objectKey: objectKey,
+                timestamp: new Date().toISOString()
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to save to MongoDB');
+        }
+
+        const result = await response.json();
+        console.log('Saved to MongoDB:', result);
+        return result;
+    } catch (error) {
+        console.error('MongoDB save error:', error);
         throw error;
     }
 }
@@ -89,9 +116,12 @@ function initializeButton() {
             
             const response = await fetch(screenshot);
             const blob = await response.blob();
-            await uploadToMinio(blob);
+            const objectKey = await uploadToMinio(blob);
             
-            document.getElementById('status').textContent = 'Screenshot uploaded successfully!';
+            document.getElementById('status').textContent = 'Saving to database...';
+            await saveToMongoDB(objectKey);
+            
+            document.getElementById('status').textContent = 'Screenshot uploaded and saved successfully!';
         } catch (error) {
             console.error('Error:', error);
             document.getElementById('status').textContent = 'Error: ' + error.message;
