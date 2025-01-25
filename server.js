@@ -6,7 +6,7 @@ const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { OpenAI } = require('openai');
 
 const app = express();
-const port = 3002;
+const port = process.env.PORT || 3002;
 const path = require('path');
 
 // Serve static files from various directories
@@ -16,10 +16,10 @@ app.use('/components', express.static('components'));
 
 // Initialize AWS S3 (MinIO)
 const s3Client = new S3Client({
-    endpoint: 'http://localhost:9000',
+    endpoint: process.env.MINIO_ENDPOINT || 'http://localhost:9000',
     credentials: {
-        accessKeyId: 'admin',
-        secretAccessKey: 'my-secret-pw'
+        accessKeyId: process.env.MINIO_ACCESS_KEY || 'admin',
+        secretAccessKey: process.env.MINIO_SECRET_KEY || 'my-secret-pw'
     },
     region: 'us-east-1', // Required but not used by MinIO
     forcePathStyle: true
@@ -33,7 +33,7 @@ const openai = new OpenAI({
 // Function to get image from MinIO
 async function getImageFromMinIO(objectKey) {
     const params = {
-        Bucket: 'my-bucket',
+        Bucket: process.env.MINIO_BUCKET_NAME || 'my-bucket',
         Key: objectKey
     };
     const command = new GetObjectCommand(params);
@@ -114,8 +114,8 @@ async function processNewImages() {
 setInterval(processNewImages, 60000);
 
 // MongoDB connection URL
-const mongoUrl = 'mongodb://localhost:27017';
-const dbName = 'memory_db';
+const mongoUrl = process.env.MONGODB_URL || 'mongodb://localhost:27017';
+const dbName = process.env.MONGODB_DB_NAME || 'memory_db';
 
 app.use(cors());
 app.use(express.json());
