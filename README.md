@@ -38,6 +38,24 @@ A Chrome extension that enables users to capture screenshots with advanced featu
 - OpenAI API key
 - Chrome browser
 
+## API Endpoints
+
+### Screenshot Management
+
+- `POST /save-minio-key` - Save a new screenshot reference to MongoDB
+- `GET /transcribed-images` - Retrieve all transcribed images
+
+### Transcription Management
+
+- `POST /remove-all-transcriptions` - Remove all transcriptions from the database
+  - **⚠️ CAUTION:** This is a destructive operation that removes all transcribed text from the MongoDB database
+  - The original images in MinIO/S3 remain untouched
+  - Use this endpoint with extreme caution as it cannot be undone
+  - Example usage:
+    ```bash
+    curl -X POST http://localhost:3002/remove-all-transcriptions
+    ```
+
 ## Database and Storage Setup
 
 ### MongoDB Setup
