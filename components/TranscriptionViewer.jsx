@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import ReactMarkdown from 'react-markdown';
 import { Card, CardContent } from './ui/card';
+import MarkdownIt from 'markdown-it';
+import multiMdTable from 'markdown-it-multimd-table';
 
 function TranscriptionViewer() {
   const [transcriptions, setTranscriptions] = useState([]);
@@ -64,20 +65,59 @@ function TranscriptionViewer() {
       <ul {...props} className="list-disc ml-6 my-2">
         {children}
       </ul>
+    ),
+    table: ({ children, ...props }) => (
+      <table {...props} className="min-w-full border border-gray-300">
+        {children}
+      </table>
+    ),
+    thead: ({ children, ...props }) => (
+      <thead {...props} className="bg-gray-50">
+        {children}
+      </thead>
+    ),
+    tbody: ({ children, ...props }) => (
+      <tbody {...props}>
+        {children}
+      </tbody>
+    ),
+    tr: ({ children, ...props }) => (
+      <tr {...props} className="border-b border-gray-300">
+        {children}
+      </tr>
+    ),
+    th: ({ children, ...props }) => (
+      <th {...props} className="border-r border-gray-300 px-4 py-2 text-left">
+        {children}
+      </th>
+    ),
+    td: ({ children, ...props }) => (
+      <td {...props} className="border-r border-gray-300 px-4 py-2">
+        {children}
+      </td>
     )
   };
+
+  const md = new MarkdownIt({
+    html: true,
+    linkify: true,
+    typographer: true
+  }).use(multiMdTable, {
+    multiline: true,
+    rowspan: true,
+    headerless: true
+  });
 
   const renderContent = (content) => {
     if (!content) return null;
     
     try {
+      const htmlContent = md.render(content);
       return (
-        <ReactMarkdown 
-          components={components}
-          className="prose max-w-none"
-        >
-          {content}
-        </ReactMarkdown>
+        <div
+          className="prose prose-sm max-w-none overflow-x-auto"
+          dangerouslySetInnerHTML={{ __html: htmlContent }}
+        />
       );
     } catch (err) {
       console.error('Markdown rendering error:', err);
