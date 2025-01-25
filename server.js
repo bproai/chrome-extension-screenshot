@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const { MongoClient } = require('mongodb');
 const cors = require('cors');
-const AWS = require('aws-sdk');
+const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { OpenAI } = require('openai');
 
 const app = express();
@@ -15,12 +15,14 @@ app.use(express.static('public'));
 app.use('/components', express.static('components'));
 
 // Initialize AWS S3 (MinIO)
-const s3 = new AWS.S3({
+const s3Client = new S3Client({
     endpoint: 'http://localhost:9000',
-    accessKeyId: 'admin',
-    secretAccessKey: 'my-secret-pw',
-    s3ForcePathStyle: true,
-    signatureVersion: 'v4'
+    credentials: {
+        accessKeyId: 'admin',
+        secretAccessKey: 'my-secret-pw'
+    },
+    region: 'us-east-1', // Required but not used by MinIO
+    forcePathStyle: true
 });
 
 // Initialize OpenAI
@@ -34,8 +36,9 @@ async function getImageFromMinIO(objectKey) {
         Bucket: 'my-bucket',
         Key: objectKey
     };
-    const data = await s3.getObject(params).promise();
-    return data.Body;
+    const command = new GetObjectCommand(params);
+    const response = await s3Client.send(command);
+    return Buffer.concat(await response.Body.toArray());
 }
 
 // Function to transcribe image using OpenAI
