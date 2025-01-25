@@ -32,8 +32,9 @@ A Chrome extension that enables users to capture screenshots with advanced featu
 ## Prerequisites
 
 - Node.js (Latest LTS version recommended)
-- MongoDB instance
-- AWS account and credentials
+- Docker (recommended for local development)
+- MongoDB instance (or Docker)
+- AWS account and credentials (or MinIO via Docker)
 - OpenAI API key
 - Chrome browser
 
@@ -41,6 +42,19 @@ A Chrome extension that enables users to capture screenshots with advanced featu
 
 ### MongoDB Setup
 
+For local development, Docker is recommended for a clean and isolated setup:
+
+```bash
+# Pull and run MongoDB container
+docker run -d \
+  --name mongodb \
+  -p 27017:27017 \
+  -e MONGO_INITDB_ROOT_USERNAME=admin \
+  -e MONGO_INITDB_ROOT_PASSWORD=password \
+  mongo:latest
+```
+
+Alternatively, you can:
 1. Install MongoDB locally or create a MongoDB Atlas account
 2. Create a new database for the project
 3. Create the following collections:
@@ -53,7 +67,18 @@ A Chrome extension that enables users to capture screenshots with advanced featu
 ### MinIO/S3 Bucket Setup
 
 1. Set up MinIO locally or use AWS S3:
-   - For MinIO:
+   - For MinIO using Docker (recommended):
+     ```bash
+     # Pull and run MinIO container
+     docker run -d \
+       --name minio \
+       -p 9000:9000 \
+       -p 9001:9001 \
+       -e "MINIO_ROOT_USER=minioadmin" \
+       -e "MINIO_ROOT_PASSWORD=minioadmin" \
+       quay.io/minio/minio server /data --console-address ":9001"
+     ```
+   - Alternative local installation:
      ```bash
      # Install MinIO (macOS example)
      brew install minio/stable/minio
