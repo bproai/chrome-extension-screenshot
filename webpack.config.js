@@ -42,7 +42,8 @@ module.exports = {
     new HtmlWebpackPlugin({
       template: 'public/transcriptions.html',
       filename: 'transcriptions.html',
-      inject: true
+      inject: true,
+      favicon: 'icons/favicon.ico'  // Will output to icons/favicon.ico
     })
   ],
   resolve: {
