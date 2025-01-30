@@ -4,12 +4,13 @@ const HtmlWebpackPlugin = require('html-webpack-plugin');
 module.exports = {
   mode: 'development',
   entry: {
-    app: './public/app.jsx'
+    app: './public/app.jsx',
+    whiteboard: './public/whiteboard-app.jsx'
   },
   output: {
     path: path.resolve(__dirname, 'dist'),
-    filename: 'js/[name].[contenthash].js',
-    publicPath: '/dist/'
+    filename: 'js/[name].bundle.js',
+    publicPath: '/'
   },
   module: {
     rules: [
@@ -43,7 +44,15 @@ module.exports = {
       template: 'public/transcriptions.html',
       filename: 'transcriptions.html',
       inject: true,
-      favicon: 'icons/favicon.ico'  // Will output to icons/favicon.ico
+      favicon: 'icons/favicon.ico',
+      chunks: ['app']
+    }),
+    new HtmlWebpackPlugin({
+      template: 'public/whiteboard.html',
+      filename: 'whiteboard.html',
+      inject: true,
+      favicon: 'icons/favicon.ico',
+      chunks: ['whiteboard']
     })
   ],
   resolve: {

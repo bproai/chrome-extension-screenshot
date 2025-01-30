@@ -9,8 +9,17 @@ const app = express();
 const port = process.env.PORT || 3002;
 const path = require('path');
 
-// Serve static files from various directories
-app.use('/dist', express.static('dist'));
+// Serve static files with proper MIME types
+app.use('/dist', express.static(path.join(__dirname, 'dist'), {
+  setHeaders: (res, path) => {
+    if (path.endsWith('.css')) {
+      res.setHeader('Content-Type', 'text/css');
+    } else if (path.endsWith('.js')) {
+      res.setHeader('Content-Type', 'application/javascript');
+    }
+  }
+}));
+app.use('/icons', express.static(path.join(__dirname, 'icons')));
 app.use(express.static('public'));
 app.use('/components', express.static('components'));
 
@@ -229,8 +238,23 @@ app.get('/viewer', (req, res) => {
     res.sendFile(path.join(__dirname, 'dist', 'transcriptions.html'));
 });
 
+// Route to serve the whiteboard page
+app.get('/whiteboard', (req, res) => {
+    res.sendFile(path.join(__dirname, 'dist', 'whiteboard.html'));
+});
+
+// Catch-all route for client-side routing
+app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/dist/') || req.path.startsWith('/icons/')) {
+        next();
+    } else {
+        res.sendFile(path.join(__dirname, 'dist', req.path));
+    }
+});
+
 app.listen(port, () => {
     console.log(`Server running at http://localhost:${port}`);
     console.log('Processing new images every minute...');
     console.log(`Transcription viewer available at http://localhost:${port}/viewer`);
+    console.log(`Whiteboard available at http://localhost:${port}/whiteboard`);
 });
