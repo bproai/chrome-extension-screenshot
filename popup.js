@@ -93,8 +93,9 @@ function initializeButtons() {
     console.log('Initializing buttons');
     const captureBtn = document.getElementById('captureBtn');
     const viewTranscriptionsBtn = document.getElementById('viewTranscriptionsBtn');
+    const whiteboardBtn = document.getElementById('whiteboardBtn');
     
-    if (!captureBtn || !viewTranscriptionsBtn) {
+    if (!captureBtn || !viewTranscriptionsBtn || !whiteboardBtn) {
         console.error('One or more buttons not found');
         return;
     }
@@ -104,6 +105,11 @@ function initializeButtons() {
     // Initialize view transcriptions button
     viewTranscriptionsBtn.addEventListener('click', () => {
         chrome.tabs.create({ url: 'http://localhost:3002/viewer' });
+    });
+
+    // Initialize whiteboard button
+    whiteboardBtn.addEventListener('click', () => {
+        chrome.tabs.create({ url: 'http://localhost:3002/whiteboard' });
     });
     
     // Initialize capture button
