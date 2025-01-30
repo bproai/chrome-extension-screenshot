@@ -44,6 +44,7 @@ A Chrome extension that enables users to capture screenshots with advanced featu
 
 - `POST /save-minio-key` - Save a new screenshot reference to MongoDB
 - `GET /transcribed-images` - Retrieve all transcribed images
+- `GET /viewer` - Access the transcription viewer interface
 
 ### Transcription Management
 
@@ -74,12 +75,11 @@ docker run -d \
 
 Alternatively, you can:
 1. Install MongoDB locally or create a MongoDB Atlas account
-2. Create a new database for the project
+2. Create a new database for the project (default: memory_db)
 3. Create the following collections:
-   - `screenshots` - Stores screenshot metadata
-   - `transcriptions` - Stores transcription data
+   - `minio_bucket` - Stores screenshot metadata and transcriptions
 4. Get your MongoDB connection URI:
-   - For local MongoDB: `mongodb://localhost:27017/your_database_name`
+   - For local MongoDB: `mongodb://localhost:27017/memory_db`
    - For MongoDB Atlas: Get the connection string from your cluster settings
 
 ### MinIO/S3 Bucket Setup
@@ -92,8 +92,8 @@ Alternatively, you can:
        --name minio \
        -p 9000:9000 \
        -p 9001:9001 \
-       -e "MINIO_ROOT_USER=minioadmin" \
-       -e "MINIO_ROOT_PASSWORD=minioadmin" \
+       -e "MINIO_ROOT_USER=your_minio_user" \
+       -e "MINIO_ROOT_PASSWORD=your_minio_password" \
        quay.io/minio/minio server /data --console-address ":9001"
      ```
    - Alternative local installation:
@@ -107,12 +107,12 @@ Alternatively, you can:
    - Access MinIO console (default: http://localhost:9001)
 
 2. Create a new bucket:
-   - Name it `screenshots` (or your preferred name)
+   - Name it `my-bucket` (default) or your preferred name
    - Set bucket policy to allow read/write access
    - Configure CORS policy for your domain
 
 3. Get your credentials:
-   - For MinIO: Note down the Access Key and Secret Key
+   - For MinIO: Configure your access key and secret key in the MinIO console
    - For AWS S3: Create IAM user with S3 access and get credentials
 
 4. Required bucket policy (adjust as needed):
@@ -143,20 +143,23 @@ Alternatively, you can:
    npm install
    ```
 
-3. Create a `.env` file in the root directory with your configuration:
+3. Create a `.env` file in the root directory using the provided `.env.sample` as a template:
    ```
-   # MongoDB Configuration
-   MONGODB_URI=your_mongodb_uri
+   # OpenAI API Key for image transcription
+   OPENAI_API_KEY=your_openai_api_key_here
 
-   # MinIO/S3 Configuration
-   AWS_ACCESS_KEY_ID=your_access_key
-   AWS_SECRET_ACCESS_KEY=your_secret_key
-   AWS_REGION=your_region
-   AWS_ENDPOINT=http://localhost:9000  # For MinIO local setup
-   AWS_BUCKET_NAME=screenshots
+   # MongoDB Configuration (optional - defaults shown)
+   MONGODB_URL=mongodb://localhost:27017
+   MONGODB_DB_NAME=memory_db
 
-   # OpenAI Configuration
-   OPENAI_API_KEY=your_openai_api_key
+   # MinIO Configuration (optional - defaults shown)
+   MINIO_ENDPOINT=http://localhost:9000
+   MINIO_ACCESS_KEY=admin
+   MINIO_SECRET_KEY=my-secret-pw
+   MINIO_BUCKET_NAME=my-bucket
+
+   # Server Configuration (optional - default shown)
+   PORT=3002
    ```
 
 4. Build the extension:
@@ -193,6 +196,7 @@ Alternatively, you can:
 - `/components` - React components
 - `/public` - Static assets and HTML files
 - `/src` - Source code and styles
+- `/icons` - Extension icons and favicon
 - `server.js` - Backend Express server
 - `background.js` - Chrome extension background script
 - `popup.js` - Extension popup script
