@@ -58,7 +58,7 @@ async function transcribeImage(imageBuffer) {
             {
                 role: "user",
                 content: [
-                    { type: "text", text: "transcribe." },
+                    { type: "text", text: "transcribe. just the transcript. no need to say opening/closing like 'Let me know if you need anything else!'" },
                     {
                         type: "image_url",
                         image_url: {
