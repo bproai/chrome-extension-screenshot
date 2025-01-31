@@ -18,6 +18,12 @@ const Whiteboard = () => {
   const [currentStep, setCurrentStep] = useState(-1);
   const [linePoints, setLinePoints] = useState([]);
 
+  // Add new state for resize handling
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeHandle, setResizeHandle] = useState(null);
+  const [initialSize, setInitialSize] = useState({ width: 0, height: 0 });
+  const [initialMouse, setInitialMouse] = useState({ x: 0, y: 0 });  
+
   // Save current state to history
   const saveToHistory = (newImages, newLinePoints = []) => {
     const newStep = {
@@ -150,6 +156,35 @@ const Whiteboard = () => {
            y <= image.y + image.height;
   };
 
+  // Define resize handles with their cursors
+  const resizeHandles = {
+    'nw': { cursor: 'nw-resize', x: -5, y: -5 },
+    'ne': { cursor: 'ne-resize', x: 1, y: -5 },
+    'se': { cursor: 'se-resize', x: 1, y: 1 },
+    'sw': { cursor: 'sw-resize', x: -5, y: 1 }
+  };
+
+  // Helper function to check if a point is near a resize handle
+  const getResizeHandle = (x, y, image) => {
+    const handleSize = 10; // Size of resize handle hitbox
+
+    for (const [position, handle] of Object.entries(resizeHandles)) {
+      const handleX = position.includes('e') ? 
+        image.x + image.width - handleSize/2 : 
+        image.x - handleSize/2;
+      const handleY = position.includes('s') ? 
+        image.y + image.height - handleSize/2 : 
+        image.y - handleSize/2;
+
+      if (Math.abs(x - handleX) <= handleSize && Math.abs(y - handleY) <= handleSize) {
+        return position;
+      }
+    }
+    return null;
+  };
+
+
+
   const drawCanvas = () => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
@@ -210,6 +245,30 @@ const Whiteboard = () => {
         ctx.restore();
       }
     }
+
+    if (selectedImage !== null) {
+      const img = images[selectedImage];
+      if (img) {
+        ctx.save();
+        
+        // Draw selection border
+        ctx.strokeStyle = '#00ff00';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(img.x - 2, img.y - 2, img.width + 4, img.height + 4);
+
+        // Draw resize handles
+        ctx.fillStyle = '#00ff00';
+        Object.entries(resizeHandles).forEach(([position, handle]) => {
+          const x = position.includes('e') ? img.x + img.width : img.x;
+          const y = position.includes('s') ? img.y + img.height : img.y;
+          ctx.beginPath();
+          ctx.arc(x, y, 5, 0, Math.PI * 2);
+          ctx.fill();
+        });
+
+        ctx.restore();
+      }
+    }
   };
 
   useEffect(() => {
@@ -266,10 +325,24 @@ const Whiteboard = () => {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
+    // Check for resize handle first if an image is selected
+    if (selectedImage !== null) {
+      const handle = getResizeHandle(x, y, images[selectedImage]);
+      if (handle) {
+        setIsResizing(true);
+        setResizeHandle(handle);
+        setInitialSize({
+          width: images[selectedImage].width,
+          height: images[selectedImage].height
+        });
+        setInitialMouse({ x, y });
+        return;
+      }
+    }
+
     const clickedImageIndex = images.findIndex(img => isPointInImage(x, y, img));
     
     if (clickedImageIndex !== -1) {
-      // Only update selection and dragging state, don't modify history
       setSelectedImage(clickedImageIndex);
       setIsDragging(true);
       setDragOffset({
@@ -283,18 +356,58 @@ const Whiteboard = () => {
       setLastY(y);
       setLinePoints([{ x, y }]);
     }
-    
-    drawCanvas();
   };
 
   const draw = (e) => {
-    if (!isDrawing && !isDragging) return;
+    if (!isDrawing && !isDragging && !isResizing) return;
     
     const rect = canvasRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
-    if (isDragging && selectedImage !== null) {
+    if (isResizing && selectedImage !== null) {
+      const img = images[selectedImage];
+      const dx = x - initialMouse.x;
+      const dy = y - initialMouse.y;
+      
+      // Calculate new size based on resize handle and maintain aspect ratio
+      let newWidth = initialSize.width;
+      let newHeight = initialSize.height;
+      const aspectRatio = initialSize.width / initialSize.height;
+      
+      if (resizeHandle.includes('e')) {
+        newWidth = Math.max(50, initialSize.width + dx);
+        newHeight = newWidth / aspectRatio;
+      } else if (resizeHandle.includes('w')) {
+        newWidth = Math.max(50, initialSize.width - dx);
+        newHeight = newWidth / aspectRatio;
+      }
+      if (resizeHandle.includes('s')) {
+        newHeight = Math.max(50, initialSize.height + dy);
+        newWidth = newHeight * aspectRatio;
+      } else if (resizeHandle.includes('n')) {
+        newHeight = Math.max(50, initialSize.height - dy);
+        newWidth = newHeight * aspectRatio;
+      }
+
+      const newImages = images.map((img, index) => {
+        if (index === selectedImage) {
+          const newX = resizeHandle.includes('w') ? img.x - (newWidth - initialSize.width) : img.x;
+          const newY = resizeHandle.includes('n') ? img.y - (newHeight - initialSize.height) : img.y;
+          return {
+            ...img,
+            x: newX,
+            y: newY,
+            width: newWidth,
+            height: newHeight
+          };
+        }
+        return img;
+      });
+      
+      setImages(newImages);
+      drawCanvas();
+    } else if (isDragging && selectedImage !== null) {
       const newImages = images.map((img, index) => {
         if (index === selectedImage) {
           return {
@@ -315,7 +428,11 @@ const Whiteboard = () => {
   };
 
   const stopDrawing = () => {
-    if (isDrawing && linePoints.length > 1) {
+    if (isResizing) {
+      saveToHistory(images);
+      setIsResizing(false);
+      setResizeHandle(null);
+    } else if (isDrawing && linePoints.length > 1) {
       const currentLines = history[currentStep]?.lines || [];
       
       // Get highest z-index
@@ -346,6 +463,26 @@ const Whiteboard = () => {
     if (file) {
       handleImageFile(file);
     }
+  };
+
+  // Update canvas cursor based on resize handles
+  const handleMouseMove = (e) => {
+    if (selectedImage !== null && !isResizing && !isDragging) {
+      const rect = canvasRef.current.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      
+      const handle = getResizeHandle(x, y, images[selectedImage]);
+      if (handle) {
+        canvasRef.current.style.cursor = resizeHandles[handle].cursor;
+      } else if (isPointInImage(x, y, images[selectedImage])) {
+        canvasRef.current.style.cursor = 'move';
+      } else {
+        canvasRef.current.style.cursor = 'crosshair';
+      }
+    }
+    
+    draw(e);
   };
 
   return (
@@ -402,7 +539,7 @@ const Whiteboard = () => {
           ref={canvasRef}
           className="border-2 border-gray-400 rounded cursor-crosshair"
           onMouseDown={startDrawing}
-          onMouseMove={draw}
+          onMouseMove={handleMouseMove}
           onMouseUp={stopDrawing}
           onMouseOut={stopDrawing}
         />

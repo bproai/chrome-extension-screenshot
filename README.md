@@ -84,6 +84,7 @@ Alternatively, you can:
 
 ### MinIO/S3 Bucket Setup
 
+#### Server Setup
 1. Set up MinIO locally or use AWS S3:
    - For MinIO using Docker (recommended):
      ```bash
@@ -129,6 +130,50 @@ Alternatively, you can:
      ]
    }
    ```
+
+#### Browser Client Usage
+The extension includes a MinIO client that can be accessed from the browser. Here's how to use it:
+
+1. MinIO Access Points:
+   - Console UI: `http://localhost:9001`
+     - Web interface for managing MinIO
+     - Log in with your MinIO credentials (default: username set in MINIO_ROOT_USER)
+     - Use this interface to:
+       - Monitor your storage
+       - Manage buckets and files directly
+       - Configure access policies
+       - View usage statistics
+   
+   - API Endpoint: `http://localhost:9000`
+     - Used for programmatic access
+     - This is the endpoint for:
+       - S3 API calls
+       - SDK connections
+       - Direct file operations
+
+2. After setting up MinIO server and loading the extension:
+  - The extension automatically connects to MinIO using credentials from your environment configuration
+  - Images are stored in the configured bucket (default: `my-bucket`)
+
+2. Accessing stored images:
+  - Navigate to `http://localhost:3002/viewer` in your browser
+  - This opens the transcription viewer interface where you can:
+    - View all captured screenshots
+    - See their transcriptions
+    - Access the original images directly from MinIO storage
+
+3. Storage structure:
+  - Screenshots are stored with unique keys in the format: `screenshot-{timestamp}.png`
+  - Each image has associated metadata stored in MongoDB including:
+    - MinIO object key
+    - Capture timestamp
+    - Transcription data (if available)
+
+4. Troubleshooting:
+  - Ensure MinIO server is running and accessible
+  - Check browser console for any connection errors
+  - Verify your MinIO credentials in `.env` file
+  - Confirm the bucket has proper CORS and access policies configured
 
 ## Installation
 

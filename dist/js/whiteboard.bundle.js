@@ -79,6 +79,30 @@ var Whiteboard = function Whiteboard() {
     linePoints = _useState22[0],
     setLinePoints = _useState22[1];
 
+  // Add new state for resize handling
+  var _useState23 = (0,react__WEBPACK_IMPORTED_MODULE_3__.useState)(false),
+    _useState24 = (0,_babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_2__["default"])(_useState23, 2),
+    isResizing = _useState24[0],
+    setIsResizing = _useState24[1];
+  var _useState25 = (0,react__WEBPACK_IMPORTED_MODULE_3__.useState)(null),
+    _useState26 = (0,_babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_2__["default"])(_useState25, 2),
+    resizeHandle = _useState26[0],
+    setResizeHandle = _useState26[1];
+  var _useState27 = (0,react__WEBPACK_IMPORTED_MODULE_3__.useState)({
+      width: 0,
+      height: 0
+    }),
+    _useState28 = (0,_babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_2__["default"])(_useState27, 2),
+    initialSize = _useState28[0],
+    setInitialSize = _useState28[1];
+  var _useState29 = (0,react__WEBPACK_IMPORTED_MODULE_3__.useState)({
+      x: 0,
+      y: 0
+    }),
+    _useState30 = (0,_babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_2__["default"])(_useState29, 2),
+    initialMouse = _useState30[0],
+    setInitialMouse = _useState30[1];
+
   // Save current state to history
   var saveToHistory = function saveToHistory(newImages) {
     var newLinePoints = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
@@ -201,6 +225,47 @@ var Whiteboard = function Whiteboard() {
   var isPointInImage = function isPointInImage(x, y, image) {
     return x >= image.x && x <= image.x + image.width && y >= image.y && y <= image.y + image.height;
   };
+
+  // Define resize handles with their cursors
+  var resizeHandles = {
+    'nw': {
+      cursor: 'nw-resize',
+      x: -5,
+      y: -5
+    },
+    'ne': {
+      cursor: 'ne-resize',
+      x: 1,
+      y: -5
+    },
+    'se': {
+      cursor: 'se-resize',
+      x: 1,
+      y: 1
+    },
+    'sw': {
+      cursor: 'sw-resize',
+      x: -5,
+      y: 1
+    }
+  };
+
+  // Helper function to check if a point is near a resize handle
+  var getResizeHandle = function getResizeHandle(x, y, image) {
+    var handleSize = 10; // Size of resize handle hitbox
+
+    for (var _i = 0, _Object$entries = Object.entries(resizeHandles); _i < _Object$entries.length; _i++) {
+      var _Object$entries$_i = (0,_babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_2__["default"])(_Object$entries[_i], 2),
+        position = _Object$entries$_i[0],
+        handle = _Object$entries$_i[1];
+      var handleX = position.includes('e') ? image.x + image.width - handleSize / 2 : image.x - handleSize / 2;
+      var handleY = position.includes('s') ? image.y + image.height - handleSize / 2 : image.y - handleSize / 2;
+      if (Math.abs(x - handleX) <= handleSize && Math.abs(y - handleY) <= handleSize) {
+        return position;
+      }
+    }
+    return null;
+  };
   var drawCanvas = function drawCanvas() {
     var _history$currentStep4;
     var canvas = canvasRef.current;
@@ -262,6 +327,31 @@ var Whiteboard = function Whiteboard() {
         ctx.restore();
       }
     }
+    if (selectedImage !== null) {
+      var _img = images[selectedImage];
+      if (_img) {
+        ctx.save();
+
+        // Draw selection border
+        ctx.strokeStyle = '#00ff00';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(_img.x - 2, _img.y - 2, _img.width + 4, _img.height + 4);
+
+        // Draw resize handles
+        ctx.fillStyle = '#00ff00';
+        Object.entries(resizeHandles).forEach(function (_ref) {
+          var _ref2 = (0,_babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_2__["default"])(_ref, 2),
+            position = _ref2[0],
+            handle = _ref2[1];
+          var x = position.includes('e') ? _img.x + _img.width : _img.x;
+          var y = position.includes('s') ? _img.y + _img.height : _img.y;
+          ctx.beginPath();
+          ctx.arc(x, y, 5, 0, Math.PI * 2);
+          ctx.fill();
+        });
+        ctx.restore();
+      }
+    }
   };
   (0,react__WEBPACK_IMPORTED_MODULE_3__.useEffect)(function () {
     var canvas = canvasRef.current;
@@ -318,11 +408,28 @@ var Whiteboard = function Whiteboard() {
     var rect = canvasRef.current.getBoundingClientRect();
     var x = e.clientX - rect.left;
     var y = e.clientY - rect.top;
+
+    // Check for resize handle first if an image is selected
+    if (selectedImage !== null) {
+      var handle = getResizeHandle(x, y, images[selectedImage]);
+      if (handle) {
+        setIsResizing(true);
+        setResizeHandle(handle);
+        setInitialSize({
+          width: images[selectedImage].width,
+          height: images[selectedImage].height
+        });
+        setInitialMouse({
+          x: x,
+          y: y
+        });
+        return;
+      }
+    }
     var clickedImageIndex = images.findIndex(function (img) {
       return isPointInImage(x, y, img);
     });
     if (clickedImageIndex !== -1) {
-      // Only update selection and dragging state, don't modify history
       setSelectedImage(clickedImageIndex);
       setIsDragging(true);
       setDragOffset({
@@ -339,15 +446,52 @@ var Whiteboard = function Whiteboard() {
         y: y
       }]);
     }
-    drawCanvas();
   };
   var draw = function draw(e) {
-    if (!isDrawing && !isDragging) return;
+    if (!isDrawing && !isDragging && !isResizing) return;
     var rect = canvasRef.current.getBoundingClientRect();
     var x = e.clientX - rect.left;
     var y = e.clientY - rect.top;
-    if (isDragging && selectedImage !== null) {
+    if (isResizing && selectedImage !== null) {
+      var img = images[selectedImage];
+      var dx = x - initialMouse.x;
+      var dy = y - initialMouse.y;
+
+      // Calculate new size based on resize handle and maintain aspect ratio
+      var newWidth = initialSize.width;
+      var newHeight = initialSize.height;
+      var aspectRatio = initialSize.width / initialSize.height;
+      if (resizeHandle.includes('e')) {
+        newWidth = Math.max(50, initialSize.width + dx);
+        newHeight = newWidth / aspectRatio;
+      } else if (resizeHandle.includes('w')) {
+        newWidth = Math.max(50, initialSize.width - dx);
+        newHeight = newWidth / aspectRatio;
+      }
+      if (resizeHandle.includes('s')) {
+        newHeight = Math.max(50, initialSize.height + dy);
+        newWidth = newHeight * aspectRatio;
+      } else if (resizeHandle.includes('n')) {
+        newHeight = Math.max(50, initialSize.height - dy);
+        newWidth = newHeight * aspectRatio;
+      }
       var newImages = images.map(function (img, index) {
+        if (index === selectedImage) {
+          var newX = resizeHandle.includes('w') ? img.x - (newWidth - initialSize.width) : img.x;
+          var newY = resizeHandle.includes('n') ? img.y - (newHeight - initialSize.height) : img.y;
+          return _objectSpread(_objectSpread({}, img), {}, {
+            x: newX,
+            y: newY,
+            width: newWidth,
+            height: newHeight
+          });
+        }
+        return img;
+      });
+      setImages(newImages);
+      drawCanvas();
+    } else if (isDragging && selectedImage !== null) {
+      var _newImages = images.map(function (img, index) {
         if (index === selectedImage) {
           return _objectSpread(_objectSpread({}, img), {}, {
             x: x - dragOffset.x,
@@ -356,7 +500,7 @@ var Whiteboard = function Whiteboard() {
         }
         return img;
       });
-      setImages(newImages);
+      setImages(_newImages);
       drawCanvas();
     } else if (isDrawing) {
       setLinePoints(function (prev) {
@@ -369,7 +513,11 @@ var Whiteboard = function Whiteboard() {
     }
   };
   var stopDrawing = function stopDrawing() {
-    if (isDrawing && linePoints.length > 1) {
+    if (isResizing) {
+      saveToHistory(images);
+      setIsResizing(false);
+      setResizeHandle(null);
+    } else if (isDrawing && linePoints.length > 1) {
       var _history$currentStep5;
       var currentLines = ((_history$currentStep5 = history[currentStep]) === null || _history$currentStep5 === void 0 ? void 0 : _history$currentStep5.lines) || [];
 
@@ -398,6 +546,24 @@ var Whiteboard = function Whiteboard() {
     if (file) {
       handleImageFile(file);
     }
+  };
+
+  // Update canvas cursor based on resize handles
+  var handleMouseMove = function handleMouseMove(e) {
+    if (selectedImage !== null && !isResizing && !isDragging) {
+      var rect = canvasRef.current.getBoundingClientRect();
+      var x = e.clientX - rect.left;
+      var y = e.clientY - rect.top;
+      var handle = getResizeHandle(x, y, images[selectedImage]);
+      if (handle) {
+        canvasRef.current.style.cursor = resizeHandles[handle].cursor;
+      } else if (isPointInImage(x, y, images[selectedImage])) {
+        canvasRef.current.style.cursor = 'move';
+      } else {
+        canvasRef.current.style.cursor = 'crosshair';
+      }
+    }
+    draw(e);
   };
   return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default().createElement("div", {
     className: "min-h-screen bg-gray-100 p-2"
@@ -434,7 +600,7 @@ var Whiteboard = function Whiteboard() {
     ref: canvasRef,
     className: "border-2 border-gray-400 rounded cursor-crosshair",
     onMouseDown: startDrawing,
-    onMouseMove: draw,
+    onMouseMove: handleMouseMove,
     onMouseUp: stopDrawing,
     onMouseOut: stopDrawing
   })));
