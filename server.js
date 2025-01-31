@@ -72,8 +72,8 @@ async function transcribeImage(imageBuffer) {
 
         const response = await openai.chat.completions.create({
             // model: "gpt-4-turbo",
-            model: "gpt-4o",
-            // model: "gpt-4o-mini",
+            // model: "gpt-4o",
+            model: "gpt-4o-mini",
             messages: messages,
             store: true
         });

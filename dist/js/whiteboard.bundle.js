@@ -37,6 +37,41 @@ var Whiteboard = function Whiteboard() {
     _useState8 = (0,_babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_0__["default"])(_useState7, 2),
     lastY = _useState8[0],
     setLastY = _useState8[1];
+  var handleImageFile = function handleImageFile(file) {
+    if (!file.type.match('image/(jpeg|png|gif)')) {
+      alert('Please upload a valid image file (JPG, PNG, or GIF)');
+      return;
+    }
+    var url = URL.createObjectURL(file);
+    var img = new Image();
+    img.onload = function () {
+      var currentCtx = canvasRef.current.getContext('2d');
+      if (!currentCtx) return;
+      var canvas = canvasRef.current;
+      var scale = Math.min((canvas.width - 20) / img.width, (canvas.height - 20) / img.height);
+      var width = img.width * scale;
+      var height = img.height * scale;
+      var x = (canvas.width - width) / 2;
+      var y = (canvas.height - height) / 2;
+      currentCtx.drawImage(img, x, y, width, height);
+      URL.revokeObjectURL(url);
+    };
+    img.src = url;
+  };
+  var clearWhiteboard = function clearWhiteboard() {
+    var canvas = canvasRef.current;
+    var ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Clear the entire canvas
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Reset drawing settings
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+  };
   (0,react__WEBPACK_IMPORTED_MODULE_1__.useEffect)(function () {
     var canvas = canvasRef.current;
     // Use more of the available space
@@ -60,33 +95,13 @@ var Whiteboard = function Whiteboard() {
       var _iterator = _createForOfIteratorHelper(items),
         _step;
       try {
-        var _loop = function _loop() {
+        for (_iterator.s(); !(_step = _iterator.n()).done;) {
           var item = _step.value;
           if (item.type.indexOf('image') !== -1) {
             var blob = item.getAsFile();
-            var url = URL.createObjectURL(blob);
-            var img = new Image();
-            img.onload = function () {
-              // Get the current context since it might have changed
-              var currentCtx = canvasRef.current.getContext('2d');
-              if (!currentCtx) return;
-
-              // Calculate dimensions to fit the image while maintaining aspect ratio
-              var canvas = canvasRef.current;
-              var scale = Math.min((canvas.width - 20) / img.width, (canvas.height - 20) / img.height);
-              var width = img.width * scale;
-              var height = img.height * scale;
-              var x = (canvas.width - width) / 2;
-              var y = (canvas.height - height) / 2;
-              currentCtx.drawImage(img, x, y, width, height);
-              URL.revokeObjectURL(url);
-            };
-            img.src = url;
-            return 1; // break
+            handleImageFile(blob);
+            break;
           }
-        };
-        for (_iterator.s(); !(_step = _iterator.n()).done;) {
-          if (_loop()) break;
         }
       } catch (err) {
         _iterator.e(err);
@@ -146,11 +161,32 @@ var Whiteboard = function Whiteboard() {
   var stopDrawing = function stopDrawing() {
     setIsDrawing(false);
   };
+  var handleFileChange = function handleFileChange(e) {
+    var _e$target$files;
+    var file = (_e$target$files = e.target.files) === null || _e$target$files === void 0 ? void 0 : _e$target$files[0];
+    if (file) {
+      handleImageFile(file);
+    }
+  };
   return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1___default().createElement("div", {
     className: "min-h-screen bg-gray-100 p-2"
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1___default().createElement("div", {
     className: "bg-white rounded-lg shadow-lg p-2"
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1___default().createElement("canvas", {
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1___default().createElement("div", {
+    className: "mb-2 flex items-center gap-2"
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1___default().createElement("label", {
+    className: "inline-block px-4 py-2 bg-blue-500 text-white rounded cursor-pointer hover:bg-blue-600 transition-colors"
+  }, "Upload Image", /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1___default().createElement("input", {
+    type: "file",
+    accept: "image/jpeg,image/png,image/gif",
+    onChange: handleFileChange,
+    className: "hidden"
+  })), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1___default().createElement("button", {
+    onClick: clearWhiteboard,
+    className: "px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
+  }, "Clear Whiteboard"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1___default().createElement("span", {
+    className: "text-sm text-gray-600"
+  }, "Supports JPG, PNG, GIF")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_1___default().createElement("canvas", {
     ref: canvasRef,
     className: "border-2 border-gray-400 rounded cursor-crosshair",
     onMouseDown: startDrawing,
