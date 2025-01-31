@@ -6,6 +6,79 @@ const Whiteboard = () => {
   const [context, setContext] = useState(null);
   const [lastX, setLastX] = useState(0);
   const [lastY, setLastY] = useState(0);
+  
+  // State for managing images and selection
+  const [images, setImages] = useState([]);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+
+  // State for undo history
+  const [history, setHistory] = useState([]);
+  const [currentStep, setCurrentStep] = useState(-1);
+  const [linePoints, setLinePoints] = useState([]);
+
+  // Save current state to history
+  const saveToHistory = (newImages, newLinePoints = []) => {
+    const newStep = {
+      images: newImages.map(img => ({
+        ...img,
+        element: img.element,
+        url: img.url,
+        zIndex: img.zIndex || 0
+      })),
+      lines: newLinePoints.map(line => ({
+        ...line,
+        zIndex: line.zIndex || 0
+      }))
+    };
+
+    setHistory(prev => [...prev.slice(0, currentStep + 1), newStep]);
+    setCurrentStep(prev => prev + 1);
+  };
+
+  const bringToFront = () => {
+    if (selectedImage === null) return;
+    
+    // Get highest z-index
+    const maxZIndex = Math.max(
+      ...images.map(img => img.zIndex || 0),
+      ...((history[currentStep]?.lines || []).map(line => line.zIndex || 0)),
+      0
+    );
+
+    // Update selected image z-index
+    const newImages = images.map((img, index) => {
+      if (index === selectedImage) {
+        return { ...img, zIndex: maxZIndex + 1 };
+      }
+      return img;
+    });
+
+    setImages(newImages);
+    // Keep the existing lines when saving history
+    const currentLines = history[currentStep]?.lines || [];
+    saveToHistory(newImages, currentLines);
+    drawCanvas();
+  };
+
+  const undo = () => {
+    if (currentStep > 0) {
+      const previousStep = history[currentStep - 1];
+      
+      const restoredImages = previousStep.images.map(img => {
+        const currentImage = images.find(current => current.url === img.url);
+        return {
+          ...img,
+          element: currentImage ? currentImage.element : img.element
+        };
+      });
+      
+      setImages(restoredImages);
+      setCurrentStep(prev => prev - 1);
+      drawCanvas();
+    }
+  };
 
   const handleImageFile = (file) => {
     if (!file.type.match('image/(jpeg|png|gif)')) {
@@ -17,9 +90,6 @@ const Whiteboard = () => {
     const img = new Image();
     
     img.onload = () => {
-      const currentCtx = canvasRef.current.getContext('2d');
-      if (!currentCtx) return;
-
       const canvas = canvasRef.current;
       const scale = Math.min(
         (canvas.width - 20) / img.width,
@@ -30,9 +100,26 @@ const Whiteboard = () => {
       const height = img.height * scale;
       const x = (canvas.width - width) / 2;
       const y = (canvas.height - height) / 2;
+
+      // Get highest z-index
+      const maxZIndex = Math.max(
+        ...images.map(img => img.zIndex || 0),
+        ...((history[currentStep]?.lines || []).map(line => line.zIndex || 0)),
+        0
+      );
       
-      currentCtx.drawImage(img, x, y, width, height);
-      URL.revokeObjectURL(url);
+      const newImages = [...images, {
+        element: img,
+        x,
+        y,
+        width,
+        height,
+        url,
+        zIndex: maxZIndex + 1
+      }];
+      
+      setImages(newImages);
+      saveToHistory(newImages);
     };
     
     img.src = url;
@@ -43,37 +130,101 @@ const Whiteboard = () => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Clear the entire canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = 'white';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    // Reset drawing settings
     ctx.strokeStyle = '#000000';
     ctx.lineWidth = 2;
     ctx.lineCap = 'round';
+    
+    setImages([]);
+    setSelectedImage(null);
+    setLinePoints([]);
+    saveToHistory([]);
+  };
+
+  const isPointInImage = (x, y, image) => {
+    return x >= image.x && 
+           x <= image.x + image.width && 
+           y >= image.y && 
+           y <= image.y + image.height;
+  };
+
+  const drawCanvas = () => {
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Clear canvas and draw background
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Set common drawing styles
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // Draw all completed lines from history first
+    const currentLines = history[currentStep]?.lines || [];
+    currentLines.forEach(line => {
+      if (line?.points?.length >= 2) {
+        ctx.beginPath();
+        ctx.moveTo(line.points[0].x, line.points[0].y);
+        for (let i = 1; i < line.points.length; i++) {
+          ctx.lineTo(line.points[i].x, line.points[i].y);
+        }
+        ctx.stroke();
+      }
+    });
+
+    // Draw all images with their z-index
+    images
+      .slice()
+      .sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0))
+      .forEach((img, index) => {
+        if (img.element) {
+          ctx.drawImage(img.element, img.x, img.y, img.width, img.height);
+        }
+    });
+
+    // Draw current line if drawing
+    if (isDrawing && linePoints.length >= 2) {
+      ctx.beginPath();
+      ctx.moveTo(linePoints[0].x, linePoints[0].y);
+      for (let i = 1; i < linePoints.length; i++) {
+        ctx.lineTo(linePoints[i].x, linePoints[i].y);
+      }
+      ctx.stroke();
+    }
+
+    // Draw selection border last
+    if (selectedImage !== null) {
+      const img = images[selectedImage];
+      if (img) {
+        ctx.save();
+        ctx.strokeStyle = '#00ff00';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(img.x - 2, img.y - 2, img.width + 4, img.height + 4);
+        ctx.restore();
+      }
+    }
   };
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    // Use more of the available space
     canvas.width = window.innerWidth - 20;
     canvas.height = window.innerHeight - 20;
     
     const ctx = canvas.getContext('2d');
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
-    ctx.lineCap = 'round';
-
-    // Set white background
-    ctx.fillStyle = 'white';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
     setContext(ctx);
+    
+    // Initial draw with white background
+    drawCanvas();
 
-    // Handle paste events
     const handlePaste = (e) => {
       const items = e.clipboardData?.items;
-      
       if (!items) return;
 
       for (let item of items) {
@@ -84,66 +235,110 @@ const Whiteboard = () => {
         }
       }
     };
-    
-    // Handle window resize
-    const handleResize = () => {
-      const currentCtx = canvasRef.current.getContext('2d');
-      if (!currentCtx) return;
 
-      const tempCanvas = document.createElement('canvas');
-      const tempCtx = tempCanvas.getContext('2d');
-      
-      // Save current drawing
-      tempCanvas.width = canvas.width;
-      tempCanvas.height = canvas.height;
-      tempCtx.drawImage(canvas, 0, 0);
-      
-      // Resize canvas
+    const handleKeyDown = (e) => {
+      if (e.key === 'z' && (navigator.platform.toLowerCase().includes('mac') ? e.metaKey : e.ctrlKey) && !e.shiftKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        undo();
+      }
+    };
+    
+    const handleResize = () => {
       canvas.width = window.innerWidth - 20;
       canvas.height = window.innerHeight - 20;
-      
-      // Set white background
-      currentCtx.fillStyle = 'white';
-      currentCtx.fillRect(0, 0, canvas.width, canvas.height);
-      
-      // Restore drawing
-      currentCtx.drawImage(tempCanvas, 0, 0);
+      drawCanvas();
     };
 
     window.addEventListener('paste', handlePaste);
     window.addEventListener('resize', handleResize);
+    window.addEventListener('keydown', handleKeyDown);
 
     return () => {
       window.removeEventListener('paste', handlePaste);
       window.removeEventListener('resize', handleResize);
+      window.removeEventListener('keydown', handleKeyDown);
     };
-  }, []);
+  }, [images, selectedImage, history, currentStep]);
 
   const startDrawing = (e) => {
     const rect = canvasRef.current.getBoundingClientRect();
-    setIsDrawing(true);
-    setLastX(e.clientX - rect.left);
-    setLastY(e.clientY - rect.top);
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    const clickedImageIndex = images.findIndex(img => isPointInImage(x, y, img));
+    
+    if (clickedImageIndex !== -1) {
+      // Only update selection and dragging state, don't modify history
+      setSelectedImage(clickedImageIndex);
+      setIsDragging(true);
+      setDragOffset({
+        x: x - images[clickedImageIndex].x,
+        y: y - images[clickedImageIndex].y
+      });
+    } else {
+      setSelectedImage(null);
+      setIsDrawing(true);
+      setLastX(x);
+      setLastY(y);
+      setLinePoints([{ x, y }]);
+    }
+    
+    drawCanvas();
   };
 
   const draw = (e) => {
-    if (!isDrawing || !context) return;
+    if (!isDrawing && !isDragging) return;
     
     const rect = canvasRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
-    context.beginPath();
-    context.moveTo(lastX, lastY);
-    context.lineTo(x, y);
-    context.stroke();
-    
-    setLastX(x);
-    setLastY(y);
+    if (isDragging && selectedImage !== null) {
+      const newImages = images.map((img, index) => {
+        if (index === selectedImage) {
+          return {
+            ...img,
+            x: x - dragOffset.x,
+            y: y - dragOffset.y
+          };
+        }
+        return img;
+      });
+      
+      setImages(newImages);
+      drawCanvas();
+    } else if (isDrawing) {
+      setLinePoints(prev => [...prev, { x, y }]);
+      drawCanvas();
+    }
   };
 
   const stopDrawing = () => {
+    if (isDrawing && linePoints.length > 1) {
+      const currentLines = history[currentStep]?.lines || [];
+      
+      // Get highest z-index
+      const maxZIndex = Math.max(
+        ...images.map(img => img.zIndex || 0),
+        ...currentLines.map(line => line.zIndex || 0),
+        0
+      );
+
+      const newLines = [...currentLines, { 
+        points: [...linePoints],
+        zIndex: maxZIndex + 1
+      }];
+      
+      saveToHistory(images, newLines);
+      setLinePoints([]);
+    } else if (isDragging) {
+      saveToHistory(images);
+    }
+    
     setIsDrawing(false);
+    setIsDragging(false);
+    drawCanvas();
   };
 
   const handleFileChange = (e) => {
@@ -157,7 +352,10 @@ const Whiteboard = () => {
     <div className="min-h-screen bg-gray-100 p-2">
       <div className="bg-white rounded-lg shadow-lg p-2">
         <div className="mb-2 flex items-center gap-2">
-          <label className="inline-block px-4 py-2 bg-blue-500 text-white rounded cursor-pointer hover:bg-blue-600 transition-colors">
+          <label 
+            className="inline-block px-4 py-2 bg-blue-500 text-white rounded cursor-pointer hover:bg-blue-600 transition-colors"
+            title="Upload JPG, PNG, or GIF image"
+          >
             Upload Image
             <input
               type="file"
@@ -169,12 +367,36 @@ const Whiteboard = () => {
           <button
             onClick={clearWhiteboard}
             className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
+            title="Clear all content from whiteboard"
           >
             Clear Whiteboard
           </button>
-          <span className="text-sm text-gray-600">
-            Supports JPG, PNG, GIF
-          </span>
+          <button
+            onClick={undo}
+            disabled={currentStep <= 0}
+            className={`px-4 py-2 text-white rounded transition-colors ${
+              currentStep <= 0 ? 'bg-gray-400' : 'bg-blue-500 hover:bg-blue-600'
+            }`}
+            title={`Undo last action (${navigator.platform.toLowerCase().includes('mac') ? '⌘Z' : 'Ctrl+Z'})`}
+          >
+            Undo
+          </button>
+          <button
+            onClick={bringToFront}
+            disabled={selectedImage === null}
+            className={`px-4 py-2 text-white rounded transition-colors ${
+              selectedImage === null ? 'bg-gray-400' : 'bg-blue-500 hover:bg-blue-600'
+            }`}
+            title="Bring selected image to front"
+          >
+            Bring to Front
+          </button>
+          <div
+            className="ml-2 px-2 py-1 bg-gray-200 rounded-full text-sm text-gray-600 cursor-help"
+            title="Click and drag to move images • Draw anywhere else"
+          >
+            ?
+          </div>
         </div>
         <canvas
           ref={canvasRef}
