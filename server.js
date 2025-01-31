@@ -252,9 +252,9 @@ app.get('*', (req, res, next) => {
     }
 });
 
-app.listen(port, () => {
-    console.log(`Server running at http://localhost:${port}`);
+app.listen(port, '0.0.0.0', () => {
+    console.log(`Server running on port ${port} (accessible via any network interface)`);
     console.log('Processing new images every minute...');
-    console.log(`Transcription viewer available at http://localhost:${port}/viewer`);
-    console.log(`Whiteboard available at http://localhost:${port}/whiteboard`);
+    console.log(`Transcription viewer available at http://<your-ip>:${port}/viewer`);
+    console.log(`Whiteboard available at http://<your-ip>:${port}/whiteboard`);
 });
