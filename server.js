@@ -58,7 +58,7 @@ async function transcribeImage(imageBuffer) {
             {
                 role: "user",
                 content: [
-                    { type: "text", text: "transcribe. just the transcript. no need to say opening/closing like 'Let me know if you need anything else!'" },
+                    { type: "text", text: "transcribe English or Chinese text. just the transcript. no need to say opening/closing like 'Let me know if you need anything else!' If you are unable, please state why." },
                     {
                         type: "image_url",
                         image_url: {
@@ -72,8 +72,8 @@ async function transcribeImage(imageBuffer) {
 
         const response = await openai.chat.completions.create({
             // model: "gpt-4-turbo",
-            // model: "gpt-4o",
-            model: "gpt-4o-mini",
+            model: "gpt-4o",
+            // model: "gpt-4o-mini",
             messages: messages,
             store: true
         });
