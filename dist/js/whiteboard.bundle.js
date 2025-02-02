@@ -122,9 +122,15 @@ var Whiteboard = function Whiteboard() {
     initialMouse = _useState38[0],
     setInitialMouse = _useState38[1];
 
-  // Save current state to history
+  // 1. Add a new state for completed lines
+  var _useState39 = (0,react__WEBPACK_IMPORTED_MODULE_3__.useState)([]),
+    _useState40 = (0,_babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_2__["default"])(_useState39, 2),
+    completedLines = _useState40[0],
+    setCompletedLines = _useState40[1];
+
+  // 2. Modify the saveToHistory function to handle completed lines
   var saveToHistory = function saveToHistory(newImages) {
-    var newLinePoints = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
+    var newCompletedLines = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
     var newTextElements = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : [];
     var newStep = {
       images: newImages.map(function (img) {
@@ -134,7 +140,7 @@ var Whiteboard = function Whiteboard() {
           zIndex: img.zIndex || 0
         });
       }),
-      lines: newLinePoints.map(function (line) {
+      lines: [].concat((0,_babel_runtime_helpers_toConsumableArray__WEBPACK_IMPORTED_MODULE_0__["default"])(completedLines), (0,_babel_runtime_helpers_toConsumableArray__WEBPACK_IMPORTED_MODULE_0__["default"])(newCompletedLines)).map(function (line) {
         return _objectSpread(_objectSpread({}, line), {}, {
           zIndex: line.zIndex || 0
         });
@@ -242,6 +248,8 @@ var Whiteboard = function Whiteboard() {
     saveToHistory(newImages, currentLines);
     drawCanvas();
   };
+
+  // 5. Update the undo function to handle completed lines
   var undo = function undo() {
     if (currentStep > 0) {
       var previousStep = history[currentStep - 1];
@@ -254,6 +262,8 @@ var Whiteboard = function Whiteboard() {
         });
       });
       setImages(restoredImages);
+      setCompletedLines(previousStep.lines || []);
+      setTextElements(previousStep.textElements || []);
       setCurrentStep(function (prev) {
         return prev - 1;
       });
@@ -296,6 +306,8 @@ var Whiteboard = function Whiteboard() {
     };
     img.src = url;
   };
+
+  // 6. Update the clearWhiteboard function
   var clearWhiteboard = function clearWhiteboard() {
     var canvas = canvasRef.current;
     var ctx = canvas.getContext('2d');
@@ -303,14 +315,12 @@ var Whiteboard = function Whiteboard() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = 'white';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
-    ctx.lineCap = 'round';
     setImages([]);
     setSelectedImage(null);
-    setTextElements([]); // Add this line
-    setSelectedText(null); // Add this line  
+    setCompletedLines([]);
     setLinePoints([]);
+    setTextElements([]);
+    setSelectedText(null);
     saveToHistory([], [], []);
   };
   var isPointInImage = function isPointInImage(x, y, image) {
@@ -357,8 +367,9 @@ var Whiteboard = function Whiteboard() {
     }
     return null;
   };
+
+  // 3. Modify the drawCanvas function to properly handle all elements
   var drawCanvas = function drawCanvas() {
-    var _history$currentStep7;
     var canvas = canvasRef.current;
     var ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -374,45 +385,55 @@ var Whiteboard = function Whiteboard() {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    // Draw all completed lines from history first
-    var currentLines = ((_history$currentStep7 = history[currentStep]) === null || _history$currentStep7 === void 0 ? void 0 : _history$currentStep7.lines) || [];
-    currentLines.forEach(function (line) {
-      var _line$points;
-      if ((line === null || line === void 0 || (_line$points = line.points) === null || _line$points === void 0 ? void 0 : _line$points.length) >= 2) {
-        ctx.beginPath();
-        ctx.moveTo(line.points[0].x, line.points[0].y);
-        for (var i = 1; i < line.points.length; i++) {
-          ctx.lineTo(line.points[i].x, line.points[i].y);
-        }
-        ctx.stroke();
-      }
+    // Draw all elements sorted by z-index
+    var allElements = [].concat((0,_babel_runtime_helpers_toConsumableArray__WEBPACK_IMPORTED_MODULE_0__["default"])(completedLines.map(function (line) {
+      return {
+        type: 'line',
+        data: line,
+        zIndex: line.zIndex || 0
+      };
+    })), (0,_babel_runtime_helpers_toConsumableArray__WEBPACK_IMPORTED_MODULE_0__["default"])(images.map(function (img) {
+      return {
+        type: 'image',
+        data: img,
+        zIndex: img.zIndex || 0
+      };
+    })), (0,_babel_runtime_helpers_toConsumableArray__WEBPACK_IMPORTED_MODULE_0__["default"])(textElements.map(function (text) {
+      return {
+        type: 'text',
+        data: text,
+        zIndex: text.zIndex || 0
+      };
+    }))).sort(function (a, b) {
+      return (a.zIndex || 0) - (b.zIndex || 0);
     });
 
-    // Draw all images with their z-index
-    images.slice().sort(function (a, b) {
-      return (a.zIndex || 0) - (b.zIndex || 0);
-    }).forEach(function (img, index) {
-      if (img.element) {
-        ctx.drawImage(img.element, img.x, img.y, img.width, img.height);
-      }
-    });
-
-    // Draw text elements
-    textElements.slice().sort(function (a, b) {
-      return (a.zIndex || 0) - (b.zIndex || 0);
-    }).forEach(function (textEl, index) {
-      if (!textEl.isEditing) {
-        ctx.font = "".concat(textEl.fontSize, "px Arial");
-        ctx.fillStyle = '#000000';
-        ctx.fillText(textEl.text, textEl.x, textEl.y);
-
-        // Draw selection border if selected
-        if (index === selectedText) {
-          var metrics = ctx.measureText(textEl.text);
-          ctx.strokeStyle = '#00ff00';
-          ctx.lineWidth = 2;
-          ctx.strokeRect(textEl.x - 2, textEl.y - textEl.fontSize, metrics.width + 4, textEl.fontSize + 4);
-        }
+    // Draw all elements in order
+    allElements.forEach(function (element) {
+      var _element$data$points;
+      switch (element.type) {
+        case 'line':
+          if (((_element$data$points = element.data.points) === null || _element$data$points === void 0 ? void 0 : _element$data$points.length) >= 2) {
+            ctx.beginPath();
+            ctx.moveTo(element.data.points[0].x, element.data.points[0].y);
+            for (var i = 1; i < element.data.points.length; i++) {
+              ctx.lineTo(element.data.points[i].x, element.data.points[i].y);
+            }
+            ctx.stroke();
+          }
+          break;
+        case 'image':
+          if (element.data.element) {
+            ctx.drawImage(element.data.element, element.data.x, element.data.y, element.data.width, element.data.height);
+          }
+          break;
+        case 'text':
+          if (!element.data.isEditing) {
+            ctx.font = "".concat(element.data.fontSize, "px Arial");
+            ctx.fillStyle = '#000000';
+            ctx.fillText(element.data.text, element.data.x, element.data.y);
+          }
+          break;
       }
     });
 
@@ -426,7 +447,7 @@ var Whiteboard = function Whiteboard() {
       ctx.stroke();
     }
 
-    // Draw selection border last
+    // Draw selection overlays last
     if (selectedImage !== null) {
       var img = images[selectedImage];
       if (img) {
@@ -434,18 +455,6 @@ var Whiteboard = function Whiteboard() {
         ctx.strokeStyle = '#00ff00';
         ctx.lineWidth = 2;
         ctx.strokeRect(img.x - 2, img.y - 2, img.width + 4, img.height + 4);
-        ctx.restore();
-      }
-    }
-    if (selectedImage !== null) {
-      var _img = images[selectedImage];
-      if (_img) {
-        ctx.save();
-
-        // Draw selection border
-        ctx.strokeStyle = '#00ff00';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(_img.x - 2, _img.y - 2, _img.width + 4, _img.height + 4);
 
         // Draw resize handles
         ctx.fillStyle = '#00ff00';
@@ -453,8 +462,8 @@ var Whiteboard = function Whiteboard() {
           var _ref2 = (0,_babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_2__["default"])(_ref, 2),
             position = _ref2[0],
             handle = _ref2[1];
-          var x = position.includes('e') ? _img.x + _img.width : _img.x;
-          var y = position.includes('s') ? _img.y + _img.height : _img.y;
+          var x = position.includes('e') ? img.x + img.width : img.x;
+          var y = position.includes('s') ? img.y + img.height : img.y;
           ctx.beginPath();
           ctx.arc(x, y, 5, 0, Math.PI * 2);
           ctx.fill();
@@ -622,29 +631,31 @@ var Whiteboard = function Whiteboard() {
       drawCanvas();
     }
   };
+
+  // 4. Modify the stopDrawing function to handle completed lines
   var stopDrawing = function stopDrawing() {
     if (isResizing) {
-      saveToHistory(images);
+      saveToHistory(images, completedLines, textElements);
       setIsResizing(false);
       setResizeHandle(null);
     } else if (isDrawing && linePoints.length > 1) {
-      var _history$currentStep8;
-      var currentLines = ((_history$currentStep8 = history[currentStep]) === null || _history$currentStep8 === void 0 ? void 0 : _history$currentStep8.lines) || [];
-
-      // Get highest z-index
       var maxZIndex = Math.max.apply(Math, (0,_babel_runtime_helpers_toConsumableArray__WEBPACK_IMPORTED_MODULE_0__["default"])(images.map(function (img) {
         return img.zIndex || 0;
-      })).concat((0,_babel_runtime_helpers_toConsumableArray__WEBPACK_IMPORTED_MODULE_0__["default"])(currentLines.map(function (line) {
+      })).concat((0,_babel_runtime_helpers_toConsumableArray__WEBPACK_IMPORTED_MODULE_0__["default"])(completedLines.map(function (line) {
         return line.zIndex || 0;
+      })), (0,_babel_runtime_helpers_toConsumableArray__WEBPACK_IMPORTED_MODULE_0__["default"])(textElements.map(function (text) {
+        return text.zIndex || 0;
       })), [0]));
-      var newLines = [].concat((0,_babel_runtime_helpers_toConsumableArray__WEBPACK_IMPORTED_MODULE_0__["default"])(currentLines), [{
+      var newLine = {
         points: (0,_babel_runtime_helpers_toConsumableArray__WEBPACK_IMPORTED_MODULE_0__["default"])(linePoints),
         zIndex: maxZIndex + 1
-      }]);
-      saveToHistory(images, newLines);
+      };
+      var newCompletedLines = [].concat((0,_babel_runtime_helpers_toConsumableArray__WEBPACK_IMPORTED_MODULE_0__["default"])(completedLines), [newLine]);
+      setCompletedLines(newCompletedLines);
+      saveToHistory(images, newCompletedLines, textElements);
       setLinePoints([]);
     } else if (isDragging) {
-      saveToHistory(images);
+      saveToHistory(images, completedLines, textElements);
     }
     setIsDrawing(false);
     setIsDragging(false);

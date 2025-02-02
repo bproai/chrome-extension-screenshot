@@ -30,8 +30,11 @@ const Whiteboard = () => {
   const [initialSize, setInitialSize] = useState({ width: 0, height: 0 });
   const [initialMouse, setInitialMouse] = useState({ x: 0, y: 0 });  
 
-  // Save current state to history
-  const saveToHistory = (newImages, newLinePoints = [], newTextElements = []) => {
+  // 1. Add a new state for completed lines
+  const [completedLines, setCompletedLines] = useState([]);
+
+  // 2. Modify the saveToHistory function to handle completed lines
+  const saveToHistory = (newImages, newCompletedLines = [], newTextElements = []) => {
     const newStep = {
       images: newImages.map(img => ({
         ...img,
@@ -39,7 +42,7 @@ const Whiteboard = () => {
         url: img.url,
         zIndex: img.zIndex || 0
       })),
-      lines: newLinePoints.map(line => ({
+      lines: [...completedLines, ...newCompletedLines].map(line => ({
         ...line,
         zIndex: line.zIndex || 0
       })),
@@ -139,6 +142,7 @@ const Whiteboard = () => {
     drawCanvas();
   };
 
+  // 5. Update the undo function to handle completed lines
   const undo = () => {
     if (currentStep > 0) {
       const previousStep = history[currentStep - 1];
@@ -152,10 +156,13 @@ const Whiteboard = () => {
       });
       
       setImages(restoredImages);
+      setCompletedLines(previousStep.lines || []);
+      setTextElements(previousStep.textElements || []);
       setCurrentStep(prev => prev - 1);
       drawCanvas();
     }
   };
+
 
   const handleImageFile = (file) => {
     if (!file.type.match('image/(jpeg|png|gif)')) {
@@ -202,6 +209,7 @@ const Whiteboard = () => {
     img.src = url;
   };
 
+  // 6. Update the clearWhiteboard function
   const clearWhiteboard = () => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
@@ -210,15 +218,13 @@ const Whiteboard = () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = 'white';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
-    ctx.lineCap = 'round';
     
     setImages([]);
     setSelectedImage(null);
-    setTextElements([]);  // Add this line
-    setSelectedText(null);  // Add this line  
+    setCompletedLines([]);
     setLinePoints([]);
+    setTextElements([]);
+    setSelectedText(null);
     saveToHistory([], [], []);
   };
 
@@ -258,6 +264,8 @@ const Whiteboard = () => {
 
 
 
+
+  // 3. Modify the drawCanvas function to properly handle all elements
   const drawCanvas = () => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
@@ -274,52 +282,47 @@ const Whiteboard = () => {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    // Draw all completed lines from history first
-    const currentLines = history[currentStep]?.lines || [];
-    currentLines.forEach(line => {
-      if (line?.points?.length >= 2) {
-        ctx.beginPath();
-        ctx.moveTo(line.points[0].x, line.points[0].y);
-        for (let i = 1; i < line.points.length; i++) {
-          ctx.lineTo(line.points[i].x, line.points[i].y);
-        }
-        ctx.stroke();
-      }
-    });
+    // Draw all elements sorted by z-index
+    const allElements = [
+      ...completedLines.map(line => ({ type: 'line', data: line, zIndex: line.zIndex || 0 })),
+      ...images.map(img => ({ type: 'image', data: img, zIndex: img.zIndex || 0 })),
+      ...textElements.map(text => ({ type: 'text', data: text, zIndex: text.zIndex || 0 }))
+    ].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
 
-    // Draw all images with their z-index
-    images
-      .slice()
-      .sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0))
-      .forEach((img, index) => {
-        if (img.element) {
-          ctx.drawImage(img.element, img.x, img.y, img.width, img.height);
-        }
-    });
-
-    // Draw text elements
-    textElements
-      .slice()
-      .sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0))
-      .forEach((textEl, index) => {
-        if (!textEl.isEditing) {
-          ctx.font = `${textEl.fontSize}px Arial`;
-          ctx.fillStyle = '#000000';
-          ctx.fillText(textEl.text, textEl.x, textEl.y);
-
-          // Draw selection border if selected
-          if (index === selectedText) {
-            const metrics = ctx.measureText(textEl.text);
-            ctx.strokeStyle = '#00ff00';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(
-              textEl.x - 2,
-              textEl.y - textEl.fontSize,
-              metrics.width + 4,
-              textEl.fontSize + 4
+    // Draw all elements in order
+    allElements.forEach(element => {
+      switch (element.type) {
+        case 'line':
+          if (element.data.points?.length >= 2) {
+            ctx.beginPath();
+            ctx.moveTo(element.data.points[0].x, element.data.points[0].y);
+            for (let i = 1; i < element.data.points.length; i++) {
+              ctx.lineTo(element.data.points[i].x, element.data.points[i].y);
+            }
+            ctx.stroke();
+          }
+          break;
+        
+        case 'image':
+          if (element.data.element) {
+            ctx.drawImage(
+              element.data.element, 
+              element.data.x, 
+              element.data.y, 
+              element.data.width, 
+              element.data.height
             );
           }
-        }
+          break;
+        
+        case 'text':
+          if (!element.data.isEditing) {
+            ctx.font = `${element.data.fontSize}px Arial`;
+            ctx.fillStyle = '#000000';
+            ctx.fillText(element.data.text, element.data.x, element.data.y);
+          }
+          break;
+      }
     });
 
     // Draw current line if drawing
@@ -332,24 +335,11 @@ const Whiteboard = () => {
       ctx.stroke();
     }
 
-    // Draw selection border last
+    // Draw selection overlays last
     if (selectedImage !== null) {
       const img = images[selectedImage];
       if (img) {
         ctx.save();
-        ctx.strokeStyle = '#00ff00';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(img.x - 2, img.y - 2, img.width + 4, img.height + 4);
-        ctx.restore();
-      }
-    }
-
-    if (selectedImage !== null) {
-      const img = images[selectedImage];
-      if (img) {
-        ctx.save();
-        
-        // Draw selection border
         ctx.strokeStyle = '#00ff00';
         ctx.lineWidth = 2;
         ctx.strokeRect(img.x - 2, img.y - 2, img.width + 4, img.height + 4);
@@ -363,7 +353,6 @@ const Whiteboard = () => {
           ctx.arc(x, y, 5, 0, Math.PI * 2);
           ctx.fill();
         });
-
         ctx.restore();
       }
     }
@@ -525,30 +514,31 @@ const Whiteboard = () => {
     }
   };
 
+  // 4. Modify the stopDrawing function to handle completed lines
   const stopDrawing = () => {
     if (isResizing) {
-      saveToHistory(images);
+      saveToHistory(images, completedLines, textElements);
       setIsResizing(false);
       setResizeHandle(null);
     } else if (isDrawing && linePoints.length > 1) {
-      const currentLines = history[currentStep]?.lines || [];
-      
-      // Get highest z-index
       const maxZIndex = Math.max(
         ...images.map(img => img.zIndex || 0),
-        ...currentLines.map(line => line.zIndex || 0),
+        ...completedLines.map(line => line.zIndex || 0),
+        ...textElements.map(text => text.zIndex || 0),
         0
       );
 
-      const newLines = [...currentLines, { 
+      const newLine = { 
         points: [...linePoints],
         zIndex: maxZIndex + 1
-      }];
+      };
       
-      saveToHistory(images, newLines);
+      const newCompletedLines = [...completedLines, newLine];
+      setCompletedLines(newCompletedLines);
+      saveToHistory(images, newCompletedLines, textElements);
       setLinePoints([]);
     } else if (isDragging) {
-      saveToHistory(images);
+      saveToHistory(images, completedLines, textElements);
     }
     
     setIsDrawing(false);
