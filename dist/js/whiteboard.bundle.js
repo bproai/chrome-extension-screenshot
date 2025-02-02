@@ -26,6 +26,7 @@ function ownKeys(e, r) { var t = Object.keys(e); if (Object.getOwnPropertySymbol
 function _objectSpread(e) { for (var r = 1; r < arguments.length; r++) { var t = null != arguments[r] ? arguments[r] : {}; r % 2 ? ownKeys(Object(t), !0).forEach(function (r) { (0,_babel_runtime_helpers_defineProperty__WEBPACK_IMPORTED_MODULE_1__["default"])(e, r, t[r]); }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys(Object(t)).forEach(function (r) { Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r)); }); } return e; }
 
 var Whiteboard = function Whiteboard() {
+  var _textElements$editing, _textElements$editing2, _textElements$editing3;
   var canvasRef = (0,react__WEBPACK_IMPORTED_MODULE_3__.useRef)(null);
   var _useState = (0,react__WEBPACK_IMPORTED_MODULE_3__.useState)(false),
     _useState2 = (0,_babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_2__["default"])(_useState, 2),
@@ -79,33 +80,52 @@ var Whiteboard = function Whiteboard() {
     linePoints = _useState22[0],
     setLinePoints = _useState22[1];
 
-  // Add new state for resize handling
-  var _useState23 = (0,react__WEBPACK_IMPORTED_MODULE_3__.useState)(false),
+  // New state for text handling
+  var _useState23 = (0,react__WEBPACK_IMPORTED_MODULE_3__.useState)([]),
     _useState24 = (0,_babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_2__["default"])(_useState23, 2),
-    isResizing = _useState24[0],
-    setIsResizing = _useState24[1];
+    textElements = _useState24[0],
+    setTextElements = _useState24[1];
   var _useState25 = (0,react__WEBPACK_IMPORTED_MODULE_3__.useState)(null),
     _useState26 = (0,_babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_2__["default"])(_useState25, 2),
-    resizeHandle = _useState26[0],
-    setResizeHandle = _useState26[1];
-  var _useState27 = (0,react__WEBPACK_IMPORTED_MODULE_3__.useState)({
+    selectedText = _useState26[0],
+    setSelectedText = _useState26[1];
+  var _useState27 = (0,react__WEBPACK_IMPORTED_MODULE_3__.useState)(false),
+    _useState28 = (0,_babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_2__["default"])(_useState27, 2),
+    isAddingText = _useState28[0],
+    setIsAddingText = _useState28[1];
+  var _useState29 = (0,react__WEBPACK_IMPORTED_MODULE_3__.useState)(null),
+    _useState30 = (0,_babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_2__["default"])(_useState29, 2),
+    editingText = _useState30[0],
+    setEditingText = _useState30[1];
+
+  // Add new state for resize handling
+  var _useState31 = (0,react__WEBPACK_IMPORTED_MODULE_3__.useState)(false),
+    _useState32 = (0,_babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_2__["default"])(_useState31, 2),
+    isResizing = _useState32[0],
+    setIsResizing = _useState32[1];
+  var _useState33 = (0,react__WEBPACK_IMPORTED_MODULE_3__.useState)(null),
+    _useState34 = (0,_babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_2__["default"])(_useState33, 2),
+    resizeHandle = _useState34[0],
+    setResizeHandle = _useState34[1];
+  var _useState35 = (0,react__WEBPACK_IMPORTED_MODULE_3__.useState)({
       width: 0,
       height: 0
     }),
-    _useState28 = (0,_babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_2__["default"])(_useState27, 2),
-    initialSize = _useState28[0],
-    setInitialSize = _useState28[1];
-  var _useState29 = (0,react__WEBPACK_IMPORTED_MODULE_3__.useState)({
+    _useState36 = (0,_babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_2__["default"])(_useState35, 2),
+    initialSize = _useState36[0],
+    setInitialSize = _useState36[1];
+  var _useState37 = (0,react__WEBPACK_IMPORTED_MODULE_3__.useState)({
       x: 0,
       y: 0
     }),
-    _useState30 = (0,_babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_2__["default"])(_useState29, 2),
-    initialMouse = _useState30[0],
-    setInitialMouse = _useState30[1];
+    _useState38 = (0,_babel_runtime_helpers_slicedToArray__WEBPACK_IMPORTED_MODULE_2__["default"])(_useState37, 2),
+    initialMouse = _useState38[0],
+    setInitialMouse = _useState38[1];
 
   // Save current state to history
   var saveToHistory = function saveToHistory(newImages) {
     var newLinePoints = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
+    var newTextElements = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : [];
     var newStep = {
       images: newImages.map(function (img) {
         return _objectSpread(_objectSpread({}, img), {}, {
@@ -118,6 +138,11 @@ var Whiteboard = function Whiteboard() {
         return _objectSpread(_objectSpread({}, line), {}, {
           zIndex: line.zIndex || 0
         });
+      }),
+      textElements: newTextElements.map(function (text) {
+        return _objectSpread(_objectSpread({}, text), {}, {
+          zIndex: text.zIndex || 0
+        });
       })
     };
     setHistory(function (prev) {
@@ -127,14 +152,78 @@ var Whiteboard = function Whiteboard() {
       return prev + 1;
     });
   };
+  var startAddingText = function startAddingText() {
+    setIsAddingText(true);
+    setSelectedImage(null);
+    setSelectedText(null);
+    canvasRef.current.style.cursor = 'text';
+  };
+  var handleCanvasClick = function handleCanvasClick(e) {
+    var _history$currentStep;
+    if (!isAddingText) return;
+    var rect = canvasRef.current.getBoundingClientRect();
+    var x = e.clientX - rect.left;
+    var y = e.clientY - rect.top;
+
+    // Get highest z-index
+    var maxZIndex = Math.max.apply(Math, (0,_babel_runtime_helpers_toConsumableArray__WEBPACK_IMPORTED_MODULE_0__["default"])(images.map(function (img) {
+      return img.zIndex || 0;
+    })).concat((0,_babel_runtime_helpers_toConsumableArray__WEBPACK_IMPORTED_MODULE_0__["default"])(textElements.map(function (text) {
+      return text.zIndex || 0;
+    })), (0,_babel_runtime_helpers_toConsumableArray__WEBPACK_IMPORTED_MODULE_0__["default"])((((_history$currentStep = history[currentStep]) === null || _history$currentStep === void 0 ? void 0 : _history$currentStep.lines) || []).map(function (line) {
+      return line.zIndex || 0;
+    })), [0]));
+    var newText = {
+      x: x,
+      y: y,
+      text: '',
+      fontSize: 20,
+      zIndex: maxZIndex + 1,
+      isEditing: true
+    };
+    var newIndex = textElements.length;
+    setTextElements(function (prev) {
+      return [].concat((0,_babel_runtime_helpers_toConsumableArray__WEBPACK_IMPORTED_MODULE_0__["default"])(prev), [newText]);
+    });
+    setEditingText(newIndex);
+    setIsAddingText(false);
+    canvasRef.current.style.cursor = 'default';
+  };
+  var handleTextChange = function handleTextChange(index, newText) {
+    var _history$currentStep2;
+    var updatedElements = textElements.map(function (el, i) {
+      return i === index ? _objectSpread(_objectSpread({}, el), {}, {
+        text: newText
+      }) : el;
+    });
+    setTextElements(updatedElements);
+    saveToHistory(images, ((_history$currentStep2 = history[currentStep]) === null || _history$currentStep2 === void 0 ? void 0 : _history$currentStep2.lines) || [], updatedElements);
+  };
+  var handleTextClick = function handleTextClick(index, e) {
+    e.stopPropagation();
+    setSelectedText(index);
+    setSelectedImage(null);
+    setEditingText(index);
+  };
+  var handleTextBlur = function handleTextBlur() {
+    var _history$currentStep3;
+    setEditingText(null);
+    var updatedElements = textElements.map(function (el) {
+      return _objectSpread(_objectSpread({}, el), {}, {
+        isEditing: false
+      });
+    });
+    setTextElements(updatedElements);
+    saveToHistory(images, ((_history$currentStep3 = history[currentStep]) === null || _history$currentStep3 === void 0 ? void 0 : _history$currentStep3.lines) || [], updatedElements);
+  };
   var bringToFront = function bringToFront() {
-    var _history$currentStep, _history$currentStep2;
+    var _history$currentStep4, _history$currentStep5;
     if (selectedImage === null) return;
 
     // Get highest z-index
     var maxZIndex = Math.max.apply(Math, (0,_babel_runtime_helpers_toConsumableArray__WEBPACK_IMPORTED_MODULE_0__["default"])(images.map(function (img) {
       return img.zIndex || 0;
-    })).concat((0,_babel_runtime_helpers_toConsumableArray__WEBPACK_IMPORTED_MODULE_0__["default"])((((_history$currentStep = history[currentStep]) === null || _history$currentStep === void 0 ? void 0 : _history$currentStep.lines) || []).map(function (line) {
+    })).concat((0,_babel_runtime_helpers_toConsumableArray__WEBPACK_IMPORTED_MODULE_0__["default"])((((_history$currentStep4 = history[currentStep]) === null || _history$currentStep4 === void 0 ? void 0 : _history$currentStep4.lines) || []).map(function (line) {
       return line.zIndex || 0;
     })), [0]));
 
@@ -149,7 +238,7 @@ var Whiteboard = function Whiteboard() {
     });
     setImages(newImages);
     // Keep the existing lines when saving history
-    var currentLines = ((_history$currentStep2 = history[currentStep]) === null || _history$currentStep2 === void 0 ? void 0 : _history$currentStep2.lines) || [];
+    var currentLines = ((_history$currentStep5 = history[currentStep]) === null || _history$currentStep5 === void 0 ? void 0 : _history$currentStep5.lines) || [];
     saveToHistory(newImages, currentLines);
     drawCanvas();
   };
@@ -179,7 +268,7 @@ var Whiteboard = function Whiteboard() {
     var url = URL.createObjectURL(file);
     var img = new Image();
     img.onload = function () {
-      var _history$currentStep3;
+      var _history$currentStep6;
       var canvas = canvasRef.current;
       var scale = Math.min((canvas.width - 20) / img.width, (canvas.height - 20) / img.height);
       var width = img.width * scale;
@@ -190,7 +279,7 @@ var Whiteboard = function Whiteboard() {
       // Get highest z-index
       var maxZIndex = Math.max.apply(Math, (0,_babel_runtime_helpers_toConsumableArray__WEBPACK_IMPORTED_MODULE_0__["default"])(images.map(function (img) {
         return img.zIndex || 0;
-      })).concat((0,_babel_runtime_helpers_toConsumableArray__WEBPACK_IMPORTED_MODULE_0__["default"])((((_history$currentStep3 = history[currentStep]) === null || _history$currentStep3 === void 0 ? void 0 : _history$currentStep3.lines) || []).map(function (line) {
+      })).concat((0,_babel_runtime_helpers_toConsumableArray__WEBPACK_IMPORTED_MODULE_0__["default"])((((_history$currentStep6 = history[currentStep]) === null || _history$currentStep6 === void 0 ? void 0 : _history$currentStep6.lines) || []).map(function (line) {
         return line.zIndex || 0;
       })), [0]));
       var newImages = [].concat((0,_babel_runtime_helpers_toConsumableArray__WEBPACK_IMPORTED_MODULE_0__["default"])(images), [{
@@ -219,8 +308,10 @@ var Whiteboard = function Whiteboard() {
     ctx.lineCap = 'round';
     setImages([]);
     setSelectedImage(null);
+    setTextElements([]); // Add this line
+    setSelectedText(null); // Add this line  
     setLinePoints([]);
-    saveToHistory([]);
+    saveToHistory([], [], []);
   };
   var isPointInImage = function isPointInImage(x, y, image) {
     return x >= image.x && x <= image.x + image.width && y >= image.y && y <= image.y + image.height;
@@ -267,7 +358,7 @@ var Whiteboard = function Whiteboard() {
     return null;
   };
   var drawCanvas = function drawCanvas() {
-    var _history$currentStep4;
+    var _history$currentStep7;
     var canvas = canvasRef.current;
     var ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -284,7 +375,7 @@ var Whiteboard = function Whiteboard() {
     ctx.lineJoin = 'round';
 
     // Draw all completed lines from history first
-    var currentLines = ((_history$currentStep4 = history[currentStep]) === null || _history$currentStep4 === void 0 ? void 0 : _history$currentStep4.lines) || [];
+    var currentLines = ((_history$currentStep7 = history[currentStep]) === null || _history$currentStep7 === void 0 ? void 0 : _history$currentStep7.lines) || [];
     currentLines.forEach(function (line) {
       var _line$points;
       if ((line === null || line === void 0 || (_line$points = line.points) === null || _line$points === void 0 ? void 0 : _line$points.length) >= 2) {
@@ -303,6 +394,25 @@ var Whiteboard = function Whiteboard() {
     }).forEach(function (img, index) {
       if (img.element) {
         ctx.drawImage(img.element, img.x, img.y, img.width, img.height);
+      }
+    });
+
+    // Draw text elements
+    textElements.slice().sort(function (a, b) {
+      return (a.zIndex || 0) - (b.zIndex || 0);
+    }).forEach(function (textEl, index) {
+      if (!textEl.isEditing) {
+        ctx.font = "".concat(textEl.fontSize, "px Arial");
+        ctx.fillStyle = '#000000';
+        ctx.fillText(textEl.text, textEl.x, textEl.y);
+
+        // Draw selection border if selected
+        if (index === selectedText) {
+          var metrics = ctx.measureText(textEl.text);
+          ctx.strokeStyle = '#00ff00';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(textEl.x - 2, textEl.y - textEl.fontSize, metrics.width + 4, textEl.fontSize + 4);
+        }
       }
     });
 
@@ -403,7 +513,7 @@ var Whiteboard = function Whiteboard() {
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [images, selectedImage, history, currentStep]);
+  }, [images, selectedImage, history, currentStep, textElements, selectedText, isDrawing]);
   var startDrawing = function startDrawing(e) {
     var rect = canvasRef.current.getBoundingClientRect();
     var x = e.clientX - rect.left;
@@ -518,8 +628,8 @@ var Whiteboard = function Whiteboard() {
       setIsResizing(false);
       setResizeHandle(null);
     } else if (isDrawing && linePoints.length > 1) {
-      var _history$currentStep5;
-      var currentLines = ((_history$currentStep5 = history[currentStep]) === null || _history$currentStep5 === void 0 ? void 0 : _history$currentStep5.lines) || [];
+      var _history$currentStep8;
+      var currentLines = ((_history$currentStep8 = history[currentStep]) === null || _history$currentStep8 === void 0 ? void 0 : _history$currentStep8.lines) || [];
 
       // Get highest z-index
       var maxZIndex = Math.max.apply(Math, (0,_babel_runtime_helpers_toConsumableArray__WEBPACK_IMPORTED_MODULE_0__["default"])(images.map(function (img) {
@@ -565,6 +675,36 @@ var Whiteboard = function Whiteboard() {
     }
     draw(e);
   };
+
+  // Add text input overlay
+  var TextInputOverlay = function TextInputOverlay(_ref3) {
+    var text = _ref3.text,
+      index = _ref3.index,
+      x = _ref3.x,
+      y = _ref3.y;
+    return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default().createElement("input", {
+      type: "text",
+      value: text,
+      onChange: function onChange(e) {
+        return handleTextChange(index, e.target.value);
+      },
+      onBlur: handleTextBlur,
+      style: {
+        position: 'absolute',
+        left: x + 'px',
+        top: y - 20 + 'px',
+        background: 'white',
+        border: '1px solid #ccc',
+        outline: 'none',
+        font: '20px Arial',
+        minWidth: '100px',
+        padding: '2px 4px',
+        zIndex: 1000,
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+      },
+      autoFocus: true
+    });
+  };
   return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default().createElement("div", {
     className: "min-h-screen bg-gray-100 p-2"
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default().createElement("div", {
@@ -593,17 +733,32 @@ var Whiteboard = function Whiteboard() {
     disabled: selectedImage === null,
     className: "px-4 py-2 text-white rounded transition-colors ".concat(selectedImage === null ? 'bg-gray-400' : 'bg-blue-500 hover:bg-blue-600'),
     title: "Bring selected image to front"
-  }, "Bring to Front"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default().createElement("div", {
+  }, "Bring to Front"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default().createElement("button", {
+    onClick: startAddingText,
+    className: "px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors",
+    title: "Add text to whiteboard"
+  }, "Add Text"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default().createElement("div", {
     className: "ml-2 px-2 py-1 bg-gray-200 rounded-full text-sm text-gray-600 cursor-help",
-    title: "Click and drag to move images \u2022 Draw anywhere else"
-  }, "?")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default().createElement("canvas", {
+    title: "Click and drag to move images \u2022 Draw anywhere else \u2022 Click Add Text to insert text"
+  }, "?")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default().createElement("div", {
+    className: "relative",
+    style: {
+      position: 'relative'
+    }
+  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default().createElement("canvas", {
     ref: canvasRef,
     className: "border-2 border-gray-400 rounded cursor-crosshair",
     onMouseDown: startDrawing,
     onMouseMove: handleMouseMove,
     onMouseUp: stopDrawing,
-    onMouseOut: stopDrawing
-  })));
+    onMouseOut: stopDrawing,
+    onClick: handleCanvasClick
+  }), editingText !== null && /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_3___default().createElement(TextInputOverlay, {
+    text: ((_textElements$editing = textElements[editingText]) === null || _textElements$editing === void 0 ? void 0 : _textElements$editing.text) || '',
+    index: editingText,
+    x: ((_textElements$editing2 = textElements[editingText]) === null || _textElements$editing2 === void 0 ? void 0 : _textElements$editing2.x) || 0,
+    y: ((_textElements$editing3 = textElements[editingText]) === null || _textElements$editing3 === void 0 ? void 0 : _textElements$editing3.y) || 0
+  }))));
 };
 /* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (Whiteboard);
 

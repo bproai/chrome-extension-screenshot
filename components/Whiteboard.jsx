@@ -18,6 +18,12 @@ const Whiteboard = () => {
   const [currentStep, setCurrentStep] = useState(-1);
   const [linePoints, setLinePoints] = useState([]);
 
+  // New state for text handling
+  const [textElements, setTextElements] = useState([]);
+  const [selectedText, setSelectedText] = useState(null);
+  const [isAddingText, setIsAddingText] = useState(false);
+  const [editingText, setEditingText] = useState(null);  
+
   // Add new state for resize handling
   const [isResizing, setIsResizing] = useState(false);
   const [resizeHandle, setResizeHandle] = useState(null);
@@ -25,7 +31,7 @@ const Whiteboard = () => {
   const [initialMouse, setInitialMouse] = useState({ x: 0, y: 0 });  
 
   // Save current state to history
-  const saveToHistory = (newImages, newLinePoints = []) => {
+  const saveToHistory = (newImages, newLinePoints = [], newTextElements = []) => {
     const newStep = {
       images: newImages.map(img => ({
         ...img,
@@ -36,12 +42,77 @@ const Whiteboard = () => {
       lines: newLinePoints.map(line => ({
         ...line,
         zIndex: line.zIndex || 0
+      })),
+      textElements: newTextElements.map(text => ({
+        ...text,
+        zIndex: text.zIndex || 0
       }))
     };
 
     setHistory(prev => [...prev.slice(0, currentStep + 1), newStep]);
     setCurrentStep(prev => prev + 1);
   };
+
+  const startAddingText = () => {
+    setIsAddingText(true);
+    setSelectedImage(null);
+    setSelectedText(null);
+    canvasRef.current.style.cursor = 'text';
+  };
+
+  const handleCanvasClick = (e) => {
+    if (!isAddingText) return;
+
+    const rect = canvasRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    // Get highest z-index
+    const maxZIndex = Math.max(
+      ...images.map(img => img.zIndex || 0),
+      ...textElements.map(text => text.zIndex || 0),
+      ...((history[currentStep]?.lines || []).map(line => line.zIndex || 0)),
+      0
+    );
+
+    const newText = {
+      x,
+      y,
+      text: '',
+      fontSize: 20,
+      zIndex: maxZIndex + 1,
+      isEditing: true
+    };
+
+    const newIndex = textElements.length;
+    setTextElements(prev => [...prev, newText]);
+    setEditingText(newIndex);
+    setIsAddingText(false);
+    canvasRef.current.style.cursor = 'default';
+  };
+
+  const handleTextChange = (index, newText) => {
+    const updatedElements = textElements.map((el, i) => 
+      i === index ? { ...el, text: newText } : el
+    );
+    setTextElements(updatedElements);
+    saveToHistory(images, history[currentStep]?.lines || [], updatedElements);
+  };
+
+  const handleTextClick = (index, e) => {
+    e.stopPropagation();
+    setSelectedText(index);
+    setSelectedImage(null);
+    setEditingText(index);
+  };
+
+  const handleTextBlur = () => {
+    setEditingText(null);
+    const updatedElements = textElements.map(el => ({ ...el, isEditing: false }));
+    setTextElements(updatedElements);
+    saveToHistory(images, history[currentStep]?.lines || [], updatedElements);
+  };
+
 
   const bringToFront = () => {
     if (selectedImage === null) return;
@@ -145,8 +216,10 @@ const Whiteboard = () => {
     
     setImages([]);
     setSelectedImage(null);
+    setTextElements([]);  // Add this line
+    setSelectedText(null);  // Add this line  
     setLinePoints([]);
-    saveToHistory([]);
+    saveToHistory([], [], []);
   };
 
   const isPointInImage = (x, y, image) => {
@@ -221,6 +294,31 @@ const Whiteboard = () => {
       .forEach((img, index) => {
         if (img.element) {
           ctx.drawImage(img.element, img.x, img.y, img.width, img.height);
+        }
+    });
+
+    // Draw text elements
+    textElements
+      .slice()
+      .sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0))
+      .forEach((textEl, index) => {
+        if (!textEl.isEditing) {
+          ctx.font = `${textEl.fontSize}px Arial`;
+          ctx.fillStyle = '#000000';
+          ctx.fillText(textEl.text, textEl.x, textEl.y);
+
+          // Draw selection border if selected
+          if (index === selectedText) {
+            const metrics = ctx.measureText(textEl.text);
+            ctx.strokeStyle = '#00ff00';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(
+              textEl.x - 2,
+              textEl.y - textEl.fontSize,
+              metrics.width + 4,
+              textEl.fontSize + 4
+            );
+          }
         }
     });
 
@@ -318,7 +416,7 @@ const Whiteboard = () => {
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [images, selectedImage, history, currentStep]);
+  }, [images, selectedImage, history, currentStep, textElements, selectedText, isDrawing]);
 
   const startDrawing = (e) => {
     const rect = canvasRef.current.getBoundingClientRect();
@@ -485,6 +583,30 @@ const Whiteboard = () => {
     draw(e);
   };
 
+  // Add text input overlay
+  const TextInputOverlay = ({ text, index, x, y }) => (
+    <input
+      type="text"
+      value={text}
+      onChange={(e) => handleTextChange(index, e.target.value)}
+      onBlur={handleTextBlur}
+      style={{
+        position: 'absolute',
+        left: x + 'px',
+        top: (y - 20) + 'px',
+        background: 'white',
+        border: '1px solid #ccc',
+        outline: 'none',
+        font: '20px Arial',
+        minWidth: '100px',
+        padding: '2px 4px',
+        zIndex: 1000,
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+      }}
+      autoFocus
+    />
+  );
+
   return (
     <div className="min-h-screen bg-gray-100 p-2">
       <div className="bg-white rounded-lg shadow-lg p-2">
@@ -528,21 +650,39 @@ const Whiteboard = () => {
           >
             Bring to Front
           </button>
+          <button
+            onClick={startAddingText}
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+            title="Add text to whiteboard"
+          >
+            Add Text
+          </button>
           <div
             className="ml-2 px-2 py-1 bg-gray-200 rounded-full text-sm text-gray-600 cursor-help"
-            title="Click and drag to move images • Draw anywhere else"
+            title="Click and drag to move images • Draw anywhere else • Click Add Text to insert text"
           >
             ?
           </div>
         </div>
-        <canvas
-          ref={canvasRef}
-          className="border-2 border-gray-400 rounded cursor-crosshair"
-          onMouseDown={startDrawing}
-          onMouseMove={handleMouseMove}
-          onMouseUp={stopDrawing}
-          onMouseOut={stopDrawing}
-        />
+        <div className="relative" style={{ position: 'relative' }}>
+          <canvas
+            ref={canvasRef}
+            className="border-2 border-gray-400 rounded cursor-crosshair"
+            onMouseDown={startDrawing}
+            onMouseMove={handleMouseMove}
+            onMouseUp={stopDrawing}
+            onMouseOut={stopDrawing}
+            onClick={handleCanvasClick}
+          />
+          {editingText !== null && (
+            <TextInputOverlay
+              text={textElements[editingText]?.text || ''}
+              index={editingText}
+              x={textElements[editingText]?.x || 0}
+              y={textElements[editingText]?.y || 0}
+            />
+          )}
+        </div>
       </div>
     </div>
   );
