@@ -94,8 +94,9 @@ function initializeButtons() {
     const captureBtn = document.getElementById('captureBtn');
     const viewTranscriptionsBtn = document.getElementById('viewTranscriptionsBtn');
     const whiteboardBtn = document.getElementById('whiteboardBtn');
+    const calendarBtn = document.getElementById('calendarBtn');
     
-    if (!captureBtn || !viewTranscriptionsBtn || !whiteboardBtn) {
+    if (!captureBtn || !viewTranscriptionsBtn || !whiteboardBtn || !calendarBtn) {
         console.error('One or more buttons not found');
         return;
     }
@@ -110,6 +111,11 @@ function initializeButtons() {
     // Initialize whiteboard button
     whiteboardBtn.addEventListener('click', () => {
         chrome.tabs.create({ url: 'http://localhost:3002/whiteboard' });
+    });
+
+    // Initialize calendar button
+    calendarBtn.addEventListener('click', () => {
+        chrome.tabs.create({ url: 'http://localhost:3002/calendar' });
     });
     
     // Initialize capture button
@@ -144,6 +150,18 @@ function initializeButtons() {
         }
     });
 }
+
+// Handle messages from calendar page
+window.addEventListener('message', async (event) => {
+    if (event.data.type === 'toggleNotifications') {
+        chrome.runtime.sendMessage(
+            {
+                type: 'toggleNotifications',
+                enabled: event.data.enabled
+            }
+        );
+    }
+});
 
 // Initialize when the window loads
 window.addEventListener('load', async () => {

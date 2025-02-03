@@ -243,6 +243,11 @@ app.get('/whiteboard', (req, res) => {
     res.sendFile(path.join(__dirname, 'dist', 'whiteboard.html'));
 });
 
+// Route to serve the calendar page
+app.get('/calendar', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'calendar.html'));
+});
+
 // Catch-all route for client-side routing
 app.get('*', (req, res, next) => {
     if (req.path.startsWith('/dist/') || req.path.startsWith('/icons/')) {

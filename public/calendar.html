@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Trader's Calendar</title>
+  <style>
+    .trader-calendar {
+      max-width: 800px;
+      margin: 20px auto;
+      padding: 20px;
+      font-family: Arial, sans-serif;
+    }
+
+    .calendar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .calendar-header button {
+      padding: 5px 10px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 5px;
+      margin-bottom: 20px;
+    }
+
+    .weekday {
+      text-align: center;
+      font-weight: bold;
+      padding: 10px;
+      background-color: #f0f0f0;
+    }
+
+    .calendar-day {
+      min-height: 100px;
+      border: 1px solid #ddd;
+      padding: 5px;
+      position: relative;
+    }
+
+    .calendar-day.empty {
+      background-color: #f9f9f9;
+    }
+
+    /* Full non-trading day (weekends and holidays) */
+    .calendar-day.non-trading {
+      background-color: #eeeeee;
+      opacity: 0.8;
+    }
+
+    /* Half trading day */
+    .calendar-day.half-trading {
+      background: repeating-linear-gradient(
+        45deg,
+        #ffffff,
+        #ffffff 10px,
+        #fff3e0 10px,
+        #fff3e0 20px
+      );
+    }
+
+    /* DST change day */
+    .calendar-day.dst-change {
+      border: 2px solid #9c27b0;
+    }
+
+    .calendar-day.non-trading .day-number {
+      color: #999;
+    }
+
+    .day-number {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      font-size: 14px;
+      color: #666;
+    }
+
+    .event {
+      margin: 20px 2px 2px;
+      padding: 4px;
+      font-size: 12px;
+      border-radius: 3px;
+      position: relative;
+    }
+
+    .event.reminder {
+      background-color: #e3f2fd;
+      border: 1px solid #bbdefb;
+    }
+
+    .event.meeting {
+      background-color: #f3e5f5;
+      border: 1px solid #e1bee7;
+    }
+
+    .event.deadline {
+      background-color: #ffebee;
+      border: 1px solid #ffcdd2;
+    }
+
+    .delete-event {
+      position: absolute;
+      right: 2px;
+      top: 2px;
+      background: none;
+      border: none;
+      color: #666;
+      cursor: pointer;
+      padding: 0 4px;
+    }
+
+    .event-form {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr auto;
+      gap: 10px;
+      padding: 20px;
+      background-color: #f5f5f5;
+      border-radius: 5px;
+    }
+
+    .event-form input,
+    .event-form select,
+    .event-form button {
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+
+    .event-form button {
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+
+    .event-form button:hover {
+      background-color: #45a049;
+    }
+
+    .market-status {
+      font-size: 11px;
+      margin-top: 4px;
+      padding: 2px 4px;
+      border-radius: 3px;
+      text-align: center;
+    }
+
+    .market-status.closed {
+      background-color: #ef5350;
+      color: white;
+    }
+
+    .market-status.half-day {
+      background-color: #ffa726;
+      color: white;
+    }
+
+    .market-status.dst {
+      background-color: #9c27b0;
+      color: white;
+    }
+
+    .legend {
+      margin-top: 20px;
+      padding: 10px;
+      background-color: #f5f5f5;
+      border-radius: 5px;
+      font-size: 12px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      margin: 5px 0;
+    }
+
+    .legend-color {
+      width: 20px;
+      height: 20px;
+      margin-right: 10px;
+      border: 1px solid #ddd;
+    }
+
+    .legend-color.regular {
+      background-color: white;
+    }
+
+    .legend-color.non-trading {
+      background-color: #eeeeee;
+      opacity: 0.8;
+    }
+
+    .legend-color.half-trading {
+      background: repeating-linear-gradient(
+        45deg,
+        #ffffff,
+        #ffffff 5px,
+        #fff3e0 5px,
+        #fff3e0 10px
+      );
+    }
+
+    .legend-color.dst {
+      background-color: white;
+      border: 2px solid #9c27b0;
+    }
+
+    .notification-settings {
+      margin-top: 20px;
+      padding: 15px;
+      background-color: #e8f5e9;
+      border-radius: 5px;
+      font-size: 14px;
+    }
+
+    .notification-toggle {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .notification-status {
+      font-size: 12px;
+      color: #666;
+      margin-top: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://unpkg.com/react@17/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+  <script type="text/babel">
+    // Define TraderCalendar component
+    const TraderCalendar = () => {
+      const [events, setEvents] = React.useState([]);
+      const [newEvent, setNewEvent] = React.useState({ title: '', date: '', type: 'reminder' });
+      const [currentDate, setCurrentDate] = React.useState(new Date());
+      const [notificationsEnabled, setNotificationsEnabled] = React.useState(false);
+      const [notificationStatus, setNotificationStatus] = React.useState('');
+
+      // US Market Holidays for 2025
+      const marketHolidays = [
+        '2025-01-01', // New Year's Day
+        '2025-01-20', // Martin Luther King Jr. Day
+        '2025-02-17', // Presidents Day
+        '2025-04-18', // Good Friday
+        '2025-05-26', // Memorial Day
+        '2025-06-19', // Juneteenth
+        '2025-07-04', // Independence Day
+        '2025-09-01', // Labor Day
+        '2025-11-27', // Thanksgiving Day
+        '2025-12-25', // Christmas Day
+      ];
+
+      // Half Trading Days for 2025 (Early Close at 10:00 AM PT)
+      const halfTradingDays = [
+        '2025-07-03', // Day before Independence Day
+        '2025-11-28', // Black Friday
+        '2025-12-24', // Christmas Eve
+      ];
+
+      // DST Change Days for 2025
+      const dstChangeDays = [
+        '2025-03-09', // Spring forward
+        '2025-11-02', // Fall back
+      ];
+
+      const isNonTradingDay = (date) => {
+        const day = date.getDay();
+        const dateStr = date.toISOString().split('T')[0];
+        
+        // Weekend (Saturday = 6, Sunday = 0)
+        if (day === 0 || day === 6) return true;
+        
+        // Market Holiday
+        return marketHolidays.includes(dateStr);
+      };
+
+      const isHalfTradingDay = (date) => {
+        const dateStr = date.toISOString().split('T')[0];
+        return halfTradingDays.includes(dateStr);
+      };
+
+      const isDSTChangeDay = (date) => {
+        const dateStr = date.toISOString().split('T')[0];
+        return dstChangeDays.includes(dateStr);
+      };
+
+      // Load initial data
+      React.useEffect(() => {
+        const savedEvents = JSON.parse(localStorage.getItem('traderEvents') || '[]');
+        setEvents(savedEvents);
+      }, []);
+
+      // Handle notification permissions
+      React.useEffect(() => {
+        const savedNotificationPref = localStorage.getItem('preMarketNotifications') === 'true';
+        if ('Notification' in window && Notification.permission === 'granted') {
+          setNotificationsEnabled(savedNotificationPref);
+        } else {
+          setNotificationsEnabled(false);
+        }
+      }, []);
+
+      // Set up premarket notification check
+      React.useEffect(() => {
+        if (!notificationsEnabled) return;
+
+        const checkPreMarketTime = () => {
+          const now = new Date();
+          const hours = now.getHours();
+          const minutes = now.getMinutes();
+          const day = now.getDay();
+
+          // Check if it's a weekday (Monday-Friday)
+          if (day >= 1 && day <= 5) {
+            // Check if it's 1:00 AM PT (30 minutes before premarket)
+            if (hours === 1 && minutes === 0) {
+              const dateStr = now.toISOString().split('T')[0];
+              
+              // Don't send notification on holidays
+              if (!marketHolidays.includes(dateStr)) {
+                new Notification('Premarket Trading Reminder', {
+                  body: 'Premarket trading begins in 30 minutes (1:30 AM PT)',
+                  icon: '/icons/icon48.png'
+                });
+              }
+            }
+          }
+        };
+
+        // Initial check
+        checkPreMarketTime();
+
+        // Check every minute
+        const notificationInterval = setInterval(checkPreMarketTime, 60000);
+
+        return () => clearInterval(notificationInterval);
+      }, [notificationsEnabled]); // marketHolidays is constant, no need to include in deps
+
+      const toggleNotifications = async () => {
+        try {
+          if (!notificationsEnabled) {
+            // Request notification permission
+            const permission = await Notification.requestPermission();
+            if (permission !== 'granted') {
+              setNotificationStatus('Notification permission denied');
+              return;
+            }
+          }
+
+          const newState = !notificationsEnabled;
+          
+          // Save to localStorage
+          localStorage.setItem('preMarketNotifications', newState.toString());
+          
+          // Post message to parent window (extension popup)
+          window.parent.postMessage(
+            {
+              type: 'toggleNotifications',
+              enabled: newState
+            },
+            '*'
+          );
+
+          setNotificationsEnabled(newState);
+          setNotificationStatus(
+            newState
+              ? 'Premarket notifications enabled (1:00 AM start & 6:00 AM end reminders)'
+              : 'Notifications disabled'
+          );
+        } catch (error) {
+          console.error('Notification error:', error);
+          setNotificationStatus('Error managing notifications');
+        }
+      };
+
+      // Load notification state from localStorage
+      React.useEffect(() => {
+        const savedNotificationPref = localStorage.getItem('preMarketNotifications') === 'true';
+        setNotificationsEnabled(savedNotificationPref);
+      }, []);
+
+      const saveEvent = (e) => {
+        e.preventDefault();
+        const updatedEvents = [...events, { ...newEvent, id: Date.now() }];
+        setEvents(updatedEvents);
+        localStorage.setItem('traderEvents', JSON.stringify(updatedEvents));
+        setNewEvent({ title: '', date: '', type: 'reminder' });
+      };
+
+      const deleteEvent = (id) => {
+        const updatedEvents = events.filter(event => event.id !== id);
+        setEvents(updatedEvents);
+        localStorage.setItem('traderEvents', JSON.stringify(updatedEvents));
+      };
+
+      const getDaysInMonth = (date) => {
+        return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+      };
+
+      const getFirstDayOfMonth = (date) => {
+        return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+      };
+
+      const getMarketStatus = (date) => {
+        const dateStr = date.toISOString().split('T')[0];
+        
+        if (isNonTradingDay(date)) {
+          const day = date.getDay();
+          return {
+            className: 'market-status closed',
+            text: day === 0 || day === 6 ? 'Weekend - Market Closed' : 'Holiday - Market Closed'
+          };
+        }
+        
+        if (isHalfTradingDay(date)) {
+          return {
+            className: 'market-status half-day',
+            text: 'Early Close (10:00 AM PT)'
+          };
+        }
+
+        if (isDSTChangeDay(date)) {
+          const isDstStart = dateStr === '2025-03-09';
+          return {
+            className: 'market-status dst',
+            text: isDstStart ? 
+              'DST Starts - Trading 6:30 AM PT' : 
+              'DST Ends - Trading 6:30 AM PT'
+          };
+        }
+
+        return null;
+      };
+
+      const renderCalendar = () => {
+        const daysInMonth = getDaysInMonth(currentDate);
+        const firstDay = getFirstDayOfMonth(currentDate);
+        const days = [];
+
+        // Add empty cells for days before the first day of the month
+        for (let i = 0; i < firstDay; i++) {
+          days.push(<div key={`empty-${i}`} className="calendar-day empty"></div>);
+        }
+
+        // Add cells for each day of the month
+        for (let day = 1; day <= daysInMonth; day++) {
+          const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
+          const dateStr = date.toISOString().split('T')[0];
+          const dayEvents = events.filter(event => event.date === dateStr);
+          const isNonTrading = isNonTradingDay(date);
+          const isHalfTrading = isHalfTradingDay(date);
+          const isDSTChange = isDSTChangeDay(date);
+          const marketStatus = getMarketStatus(date);
+
+          const dayClassName = `calendar-day ${isNonTrading ? 'non-trading' : ''} ${isHalfTrading ? 'half-trading' : ''} ${isDSTChange ? 'dst-change' : ''}`;
+
+          days.push(
+            <div key={day} className={dayClassName}>
+              <div className="day-number">{day}</div>
+              {marketStatus && (
+                <div className={marketStatus.className}>
+                  {marketStatus.text}
+                </div>
+              )}
+              {dayEvents.map(event => (
+                <div key={event.id} className={`event ${event.type}`}>
+                  {event.title}
+                  <button 
+                    onClick={() => deleteEvent(event.id)}
+                    className="delete-event"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          );
+        }
+
+        return days;
+      };
+
+      const changeMonth = (offset) => {
+        setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + offset, 1));
+      };
+
+      return (
+        <div className="trader-calendar">
+          <div className="notification-settings">
+            <div className="notification-toggle">
+              <label>
+                <input
+                  type="checkbox"
+                  checked={notificationsEnabled}
+                  onChange={toggleNotifications}
+                />
+                Enable premarket notifications (1:00 AM and 6:00 AM PT daily reminders)
+              </label>
+            </div>
+            {notificationStatus && (
+              <div className="notification-status">{notificationStatus}</div>
+            )}
+          </div>
+
+          <div className="calendar-header">
+            <button onClick={() => changeMonth(-1)}>&lt;</button>
+            <h2>
+              {currentDate.toLocaleString('default', { month: 'long' })} {currentDate.getFullYear()}
+            </h2>
+            <button onClick={() => changeMonth(1)}>&gt;</button>
+          </div>
+
+          <div className="calendar-grid">
+            <div className="weekday">Sun</div>
+            <div className="weekday">Mon</div>
+            <div className="weekday">Tue</div>
+            <div className="weekday">Wed</div>
+            <div className="weekday">Thu</div>
+            <div className="weekday">Fri</div>
+            <div className="weekday">Sat</div>
+            {renderCalendar()}
+          </div>
+
+          <form onSubmit={saveEvent} className="event-form">
+            <input
+              type="text"
+              placeholder="Event title"
+              value={newEvent.title}
+              onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
+              required
+            />
+            <input
+              type="date"
+              value={newEvent.date}
+              onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
+              required
+            />
+            <select
+              value={newEvent.type}
+              onChange={(e) => setNewEvent({ ...newEvent, type: e.target.value })}
+            >
+              <option value="reminder">Reminder</option>
+              <option value="meeting">Meeting</option>
+              <option value="deadline">Deadline</option>
+            </select>
+            <button type="submit">Add Event</button>
+          </form>
+
+          <div className="legend">
+            <h4 style={{margin: '0 0 10px 0'}}>Market Schedule Legend (Pacific Time)</h4>
+            <div className="legend-item">
+              <div className="legend-color regular"></div>
+              <span>Regular Trading Day (1:30 AM - 1:00 PM PT)</span>
+            </div>
+            <div className="legend-item">
+              <div className="legend-color half-trading"></div>
+              <span>Early Close Day (1:30 AM - 10:00 AM PT)</span>
+            </div>
+            <div className="legend-item">
+              <div className="legend-color non-trading"></div>
+              <span>Market Closed (Weekends & Holidays)</span>
+            </div>
+            <div className="legend-item">
+              <div className="legend-color dst"></div>
+              <span>DST Change - Check Trading Hours</span>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // Render the app
+    ReactDOM.render(
+      <React.StrictMode>
+        <TraderCalendar />
+      </React.StrictMode>,
+      document.getElementById('root')
+    );
+  </script>
+</body>
+</html>
