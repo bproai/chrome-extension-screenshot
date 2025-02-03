@@ -1,20 +1,40 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <link rel="stylesheet" href="public/popup.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="public/popup.css">
 </head>
 <body>
-  <div class="logo">
-    <img src="icons/icon48.png" alt="Screenshot to MinIO Logo" />
-  </div>
-  <button id="captureBtn">Capture Screenshot</button>
-  <button id="viewTranscriptionsBtn">View Transcriptions</button>
-  <button id="whiteboardBtn">Open Whiteboard</button>
-  <button id="calendarBtn">Trader's Calendar</button>
-  <div id="status"></div>
-  <img id="preview" />
-  <!-- Using local AWS SDK -->
-  <script src="aws-sdk.min.js"></script>
-  <script src="popup.js"></script>
+    <div class="logo">
+        <img src="icons/icon48.png" alt="Screenshot to MinIO Logo" />
+    </div>
+
+    <div class="button-group">
+        <div class="button-group-title">Capture</div>
+        <button id="captureBtn" aria-label="Take screenshot of current page">
+            Capture Screenshot
+        </button>
+    </div>
+
+    <div class="button-group">
+        <div class="button-group-title">Tools</div>
+        <button id="whiteboardBtn" aria-label="Open whiteboard tool">
+            Open Whiteboard
+        </button>
+        <button id="calendarBtn" aria-label="Open trader's calendar">
+            Trader's Calendar
+        </button>
+        <button id="viewTranscriptionsBtn" aria-label="View saved transcriptions">
+            View Transcriptions
+        </button>
+    </div>
+
+    <div id="status" role="status" aria-live="polite"></div>
+    <img id="preview" alt="Screenshot preview" role="img" aria-hidden="true" />
+
+    <!-- Scripts -->
+    <script src="aws-sdk.min.js"></script>
+    <script src="popup.js"></script>
 </body>
 </html>

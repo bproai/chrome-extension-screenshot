@@ -128,10 +128,16 @@ function initializeButtons() {
             const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
             console.log('Active tab found:', tab.id);
             
+            // Clear previous preview
+            const previewImg = document.getElementById('preview');
+            previewImg.removeAttribute('src');
+            previewImg.removeAttribute('alt');
+
             const screenshot = await chrome.tabs.captureVisibleTab(null, { format: 'png' });
             console.log('Screenshot captured');
             
-            document.getElementById('preview').src = screenshot;
+            previewImg.src = screenshot;
+            previewImg.alt = 'Current screenshot preview';
             document.getElementById('status').textContent = 'Uploading screenshot...';
             
             const response = await fetch(screenshot);
@@ -145,6 +151,10 @@ function initializeButtons() {
         } catch (error) {
             console.error('Error:', error);
             document.getElementById('status').textContent = 'Error: ' + error.message;
+            // Clear preview on error
+            const previewImg = document.getElementById('preview');
+            previewImg.removeAttribute('src');
+            previewImg.removeAttribute('alt');
         } finally {
             captureBtn.disabled = false;
         }
