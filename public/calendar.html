@@ -375,7 +375,7 @@
           setNotificationsEnabled(newState);
           setNotificationStatus(
             newState
-              ? 'Premarket notifications enabled (1:00 AM start & 6:00 AM end reminders)'
+              ? 'Notifications enabled (Weekdays: 1:00 AM & 6:00 AM PT, Sundays: 2:30 PM PT for futures)'
               : 'Notifications disabled'
           );
         } catch (error) {
@@ -505,7 +505,7 @@
                   checked={notificationsEnabled}
                   onChange={toggleNotifications}
                 />
-                Enable premarket notifications (1:00 AM and 6:00 AM PT daily reminders)
+                Enable notifications (1:00 AM & 6:00 AM PT weekdays, 2:30 PM PT Sundays)
               </label>
             </div>
             {notificationStatus && (

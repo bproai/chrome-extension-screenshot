@@ -6,10 +6,15 @@ const PREMARKET_END_HOUR = 6;
 const PREMARKET_MINUTE = 30;
 const NOTIFICATION_ADVANCE = 30; // minutes before premarket (1:00 AM PT)
 
+// E-mini S&P 500 futures constants
+const FUTURES_START_HOUR = 15; // 3:00 PM PT Sunday
+const FUTURES_NOTIFICATION_HOUR = 14; // 2:30 PM PT Sunday
+
 // Notification types
 const NOTIFICATIONS = {
   PREMARKET_START: 'premarket_start',
-  PREMARKET_END: 'premarket_end'
+  PREMARKET_END: 'premarket_end',
+  FUTURES_START: 'futures_start'
 };
 
 // US Market Holidays for 2025
@@ -48,6 +53,10 @@ function createNotification(type) {
     [NOTIFICATIONS.PREMARKET_END]: {
       title: 'Premarket Trading End Reminder',
       message: 'Premarket trading ends in 30 minutes (6:30 AM PT - Regular market hours begin)'
+    },
+    [NOTIFICATIONS.FUTURES_START]: {
+      title: 'E-mini S&P 500 Futures Trading Reminder',
+      message: 'E-mini S&P 500 futures trading begins in 30 minutes (3:00 PM PT)'
     }
   };
 
@@ -67,11 +76,25 @@ function createNotification(type) {
 function scheduleNextNotification() {
   const now = new Date();
   const currentHour = now.getHours();
+  const currentDay = now.getDay();
   const nextCheck = new Date(now);
   nextCheck.setSeconds(0);
   nextCheck.setMilliseconds(0);
 
-  // Determine next notification time
+  // Special handling for Sunday futures trading
+  if (currentDay === 0) { // Sunday
+    if (currentHour < FUTURES_NOTIFICATION_HOUR) {
+      // Schedule futures notification for today at 2:30 PM PT
+      nextCheck.setHours(FUTURES_NOTIFICATION_HOUR);
+      nextCheck.setMinutes(30);
+      chrome.alarms.create(`marketCheck_${NOTIFICATIONS.FUTURES_START}`, {
+        when: nextCheck.getTime()
+      });
+      return;
+    }
+  }
+
+  // Regular market day notifications
   if (currentHour < PREMARKET_START_HOUR) {
     // Schedule premarket start notification for today at 1:00 AM
     nextCheck.setHours(PREMARKET_START_HOUR);
@@ -81,24 +104,44 @@ function scheduleNextNotification() {
     nextCheck.setHours(PREMARKET_END_HOUR);
     nextCheck.setMinutes(0);
   } else {
-    // Schedule premarket start notification for tomorrow at 1:00 AM
+    // Schedule next notification
+    if (currentDay === 0 && currentHour >= FUTURES_NOTIFICATION_HOUR) {
+      // After Sunday futures notification, schedule Monday premarket
+      nextCheck.setDate(nextCheck.getDate() + 1);
+      nextCheck.setHours(PREMARKET_START_HOUR);
+      nextCheck.setMinutes(0);
+    } else if (currentDay === 5) { // Friday
+      // After Friday's sessions, schedule Sunday futures
+      nextCheck.setDate(nextCheck.getDate() + 2); // Skip to Sunday
+      nextCheck.setHours(FUTURES_NOTIFICATION_HOUR);
+      nextCheck.setMinutes(30);
+    } else {
+      // Regular next day premarket
+      nextCheck.setDate(nextCheck.getDate() + 1);
+      nextCheck.setHours(PREMARKET_START_HOUR);
+      nextCheck.setMinutes(0);
+    }
+  }
+
+  // Skip holidays
+  while (isMarketHoliday(nextCheck)) {
     nextCheck.setDate(nextCheck.getDate() + 1);
     nextCheck.setHours(PREMARKET_START_HOUR);
     nextCheck.setMinutes(0);
-  }
-
-  // Keep advancing the date until we find the next trading day
-  while (!isTradingDay(nextCheck)) {
-    nextCheck.setDate(nextCheck.getDate() + 1);
   }
 
   // Calculate delay in minutes
   const delayInMinutes = Math.max(1, (nextCheck - now) / (1000 * 60));
 
   // Determine notification type based on time
-  const notificationType = nextCheck.getHours() === PREMARKET_START_HOUR
-    ? NOTIFICATIONS.PREMARKET_START
-    : NOTIFICATIONS.PREMARKET_END;
+  let notificationType;
+  if (nextCheck.getDay() === 0) { // Sunday
+    notificationType = NOTIFICATIONS.FUTURES_START;
+  } else {
+    notificationType = nextCheck.getHours() === PREMARKET_START_HOUR
+      ? NOTIFICATIONS.PREMARKET_START
+      : NOTIFICATIONS.PREMARKET_END;
+  }
 
   // Create alarm with notification type in name
   chrome.alarms.create(`marketCheck_${notificationType}`, {
